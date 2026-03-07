@@ -1,11 +1,11 @@
 # Rask
 
-[![CI](https://github.com/agdir/rask/actions/workflows/ci.yml/badge.svg)](https://github.com/agdir/rask/actions/workflows/ci.yml)
+[![CI](https://github.com/agdiras/rask.agdir.farm/actions/workflows/ci.yml/badge.svg)](https://github.com/agdiras/rask.agdir.farm/actions/workflows/ci.yml)
 [![License: BSL](https://img.shields.io/badge/license-BSL%201.1-informational)](LICENSE)
-[![Version](https://img.shields.io/github/package-json/v/agdir/rask)](package.json)
-[![Stars](https://img.shields.io/github/stars/agdir/rask?style=social)](https://github.com/agdir/rask)
-[![Last Commit](https://img.shields.io/github/last-commit/agdir/rask)](https://github.com/agdir/rask/commits/main)
-[![Issues](https://img.shields.io/github/issues/agdir/rask)](https://github.com/agdir/rask/issues)
+[![Version](https://img.shields.io/github/package-json/v/agdiras/rask.agdir.farm)](package.json)
+[![Stars](https://img.shields.io/github/stars/agdiras/rask.agdir.farm?style=social)](https://github.com/agdiras/rask.agdir.farm)
+[![Last Commit](https://img.shields.io/github/last-commit/agdiras/rask.agdir.farm)](https://github.com/agdiras/rask.agdir.farm/commits/main)
+[![Issues](https://img.shields.io/github/issues/agdiras/rask.agdir.farm)](https://github.com/agdiras/rask.agdir.farm/issues)
 
 > Named after Ratatoskr, the Norse messenger squirrel.
 
@@ -42,7 +42,7 @@ docker run -d \
   -e RABBITMQ_HOST=your-rabbitmq-host \
   -e RABBITMQ_USER=guest \
   -e RABBITMQ_PASSWORD=guest \
-  ghcr.io/agdir/rask:latest
+  ghcr.io/agdiras/rask.agdir.farm:latest
 ```
 
 Open [http://localhost:35672](http://localhost:35672).
@@ -52,28 +52,31 @@ Open [http://localhost:35672](http://localhost:35672).
 ```yaml
 services:
   rask:
-    image: ghcr.io/agdir/rask:latest
+    image: ghcr.io/agdiras/rask.agdir.farm:latest
     ports:
       - "35672:35672"
     environment:
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_MANAGEMENT_PORT: "15672"
+      RABBITMQ_AMQP_PORT: "5672"
       RABBITMQ_USER: guest
       RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
     depends_on:
       rabbitmq:
         condition: service_healthy
-    restart: unless-stopped
 
   rabbitmq:
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:4-management
     ports:
       - "5672:5672"
       - "15672:15672"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 ```
 
 Save as `compose.yml` and run:
