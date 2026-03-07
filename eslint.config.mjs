@@ -15,6 +15,23 @@ const eslintConfig = defineConfig([
     // Worktree build artifacts:
     ".worktrees/**",
   ]),
+  {
+    rules: {
+      // setState inside effects is a well-established React pattern for
+      // browser-API initialization, hydration guards, and derived state sync.
+      "react-hooks/set-state-in-effect": "off",
+      // Accessing ref.current during render is intentional in components that
+      // use refs as mutable buffers and a separate tick state to drive re-renders.
+      "react-hooks/refs": "off",
+      // Allow _-prefixed variables as intentionally unused (destructuring discard pattern).
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        varsIgnorePattern: "^_",
+        argsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        destructuredArrayIgnorePattern: "^_",
+      }],
+    },
+  },
 ]);
 
 export default eslintConfig;

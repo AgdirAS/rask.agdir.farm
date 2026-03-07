@@ -333,7 +333,7 @@ export default function FeatureFlagsPage() {
     refetchOnWindowFocus: false,
   });
 
-  const flags = data ?? [];
+  const flags = useMemo(() => data ?? [], [data]);
 
   const enabledNames = useMemo(
     () => new Set(flags.filter((f) => f.state === "enabled").map((f) => f.name)),

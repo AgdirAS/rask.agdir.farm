@@ -18,7 +18,7 @@ const TAG_STYLES: Record<string, string> = {
 const ALL_TAGS = ["administrator", "monitoring", "management", "policymaker"] as const;
 type TagName = typeof ALL_TAGS[number];
 
-function TagBadge({ tag }: { tag: string }) {
+function TagBadge({ tag }: { tag: TagName | string }) {
   return (
     <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${TAG_STYLES[tag] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
       {tag}
