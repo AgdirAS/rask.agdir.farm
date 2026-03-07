@@ -223,6 +223,11 @@ function ExchangeDrawer({ exchange, bindings, onClose, onDelete }: DrawerProps) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reset to details tab when a different exchange is opened
+  useEffect(() => {
+    setDrawerTab("details");
+  }, [exchange?.name]);
+
   if (!exchange) return null;
 
   const isDefault_ = isDefault(exchange.name);
