@@ -6,13 +6,13 @@ import type { Channel, Connection } from "@/lib/types";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
 import { X } from "lucide-react";
 import { relativeTime, fmtBytes, fmtBytesRate, fmtDateFull } from "@/lib/utils";
 import { useTraceStream } from "@/lib/use-trace-stream";
 import { TraceTab } from "@/components/trace-tab";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── badges & icons ────────────────────────────────────────────────────────────
 
@@ -89,32 +89,32 @@ function clientName(conn: Connection): string {
   return (props.connection_name as string) ?? (props.product as string) ?? "";
 }
 
-// ── pagination ────────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 15;
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
-  const visible: (number | "…")[] = [];
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) visible.push(i);
-    else if (visible[visible.length - 1] !== "…") visible.push("…");
-  }
-  return (
-    <div className="flex gap-1 text-sm">
-      <Button variant="outline" size="sm" onClick={() => onChange(page - 1)} disabled={page === 1}>‹</Button>
-      {visible.map((v, i) =>
-        v === "…"
-          ? <span key={`e${i}`} className="px-2.5 py-1.5 text-muted-foreground">…</span>
-          : <Button key={v} size="sm" variant={v === page ? "default" : "outline"} onClick={() => onChange(v as number)}>{v}</Button>
-      )}
-      <Button variant="outline" size="sm" onClick={() => onChange(page + 1)} disabled={page === pages}>›</Button>
-    </div>
-  );
-}
-
 // ── detail drawer ─────────────────────────────────────────────────────────────
+
+const CHANNEL_COLUMNS: DataTableColumn<Channel>[] = [
+  {
+    key: "number",
+    header: "#",
+    render: (ch) => <span className="font-mono text-xs">{ch.number}</span>,
+  },
+  {
+    key: "state",
+    header: "State",
+    render: (ch) => <StateBadge state={ch.state} />,
+  },
+  {
+    key: "consumer_count",
+    header: "Consumers",
+    align: "right",
+    render: (ch) => <span className="text-xs">{ch.consumer_count}</span>,
+  },
+  {
+    key: "messages_unacknowledged",
+    header: "Unacked",
+    align: "right",
+    render: (ch) => <span className="text-xs">{ch.messages_unacknowledged}</span>,
+  },
+];
 
 function DetailDrawer({
   conn,
@@ -241,28 +241,11 @@ function DetailDrawer({
               ) : !channels || channels.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No open channels</p>
               ) : (
-                <div className="border rounded-md overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50 text-xs uppercase">
-                        <TableHead className="py-2">#</TableHead>
-                        <TableHead className="py-2">State</TableHead>
-                        <TableHead className="py-2 text-right">Consumers</TableHead>
-                        <TableHead className="py-2 text-right">Unacked</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {channels.map((ch) => (
-                        <TableRow key={ch.name}>
-                          <TableCell className="py-2 font-mono text-xs">{ch.number}</TableCell>
-                          <TableCell className="py-2"><StateBadge state={ch.state} /></TableCell>
-                          <TableCell className="py-2 text-right text-xs">{ch.consumer_count}</TableCell>
-                          <TableCell className="py-2 text-right text-xs">{ch.messages_unacknowledged}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <DataTable
+                  columns={CHANNEL_COLUMNS}
+                  data={channels}
+                  pageSize={0}
+                />
               )}
             </div>
           </div>
@@ -320,6 +303,8 @@ function DetailDrawer({
 
 const ALL_STATES = ["running", "idle", "blocked", "blocking", "flow", "closing", "closed"] as const;
 
+const PAGE_SIZE = 15;
+
 export default function ConnectionsPage() {
   const queryClient = useQueryClient();
   const { setActions } = useHeaderActions();
@@ -327,7 +312,6 @@ export default function ConnectionsPage() {
   const [stateFilter, setStateFilter]   = useState("all");
   const [vhostFilter, setVhostFilter]   = useState("all");
   const [protoFilter, setProtoFilter]   = useState("all");
-  const [page, setPage]                 = useState(1);
   const [closing, setClosing]           = useState<Set<string>>(new Set());
   const [selected, setSelected]         = useState<Connection | null>(null);
 
@@ -344,6 +328,24 @@ export default function ConnectionsPage() {
 
   const vhosts    = useMemo(() => Array.from(new Set(data?.map((c) => c.vhost) ?? [])).sort(), [data]);
   const protocols = useMemo(() => Array.from(new Set(data?.map((c) => c.protocol) ?? [])).sort(), [data]);
+
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    const q = search.toLowerCase();
+    return data.filter((c) => {
+      const cn = clientName(c).toLowerCase();
+      const matchSearch = !q || c.name.toLowerCase().includes(q) || c.peer_host.includes(q) || c.user.toLowerCase().includes(q) || cn.includes(q);
+      const matchState  = stateFilter === "all" || c.state === stateFilter;
+      const matchVhost  = vhostFilter === "all" || c.vhost === vhostFilter;
+      const matchProto  = protoFilter === "all" || c.protocol === protoFilter;
+      return matchSearch && matchState && matchVhost && matchProto;
+    });
+  }, [data, search, stateFilter, vhostFilter, protoFilter]);
+
+  const { pagedData, page, setPage, pageCount } = useDataTable({
+    data: filtered,
+    pageSize: PAGE_SIZE,
+  });
 
   useEffect(() => {
     setActions(
@@ -376,22 +378,7 @@ export default function ConnectionsPage() {
       </div>,
     );
     return () => setActions(null);
-  }, [search, stateFilter, vhostFilter, protoFilter, vhosts, protocols, setActions]);
-
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    const q = search.toLowerCase();
-    return data.filter((c) => {
-      const cn = clientName(c).toLowerCase();
-      const matchSearch = !q || c.name.toLowerCase().includes(q) || c.peer_host.includes(q) || c.user.toLowerCase().includes(q) || cn.includes(q);
-      const matchState  = stateFilter === "all" || c.state === stateFilter;
-      const matchVhost  = vhostFilter === "all" || c.vhost === vhostFilter;
-      const matchProto  = protoFilter === "all" || c.protocol === protoFilter;
-      return matchSearch && matchState && matchVhost && matchProto;
-    });
-  }, [data, search, stateFilter, vhostFilter, protoFilter]);
-
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  }, [search, stateFilter, vhostFilter, protoFilter, vhosts, protocols, setActions, setPage]);
 
   const total         = data?.length ?? 0;
   const blockedCount  = data?.filter((c) => c.state === "blocked" || c.state === "blocking" || c.state === "flow").length ?? 0;
@@ -416,6 +403,79 @@ export default function ConnectionsPage() {
     return state === "blocked" || state === "blocking" || state === "flow";
   }
 
+  const connColumns: DataTableColumn<Connection>[] = useMemo(() => [
+    {
+      key: "client",
+      header: "Client / Name",
+      render: (conn) => {
+        const cn = clientName(conn);
+        return (
+          <div>
+            <div className="font-medium">{cn || conn.name.split(" ")[0]}</div>
+            {cn && <div className="text-[11px] text-muted-foreground font-mono truncate max-w-[160px]">{conn.name}</div>}
+          </div>
+        );
+      },
+    },
+    {
+      key: "host",
+      header: "Host",
+      render: (conn) => (
+        <span className="font-mono text-sm">{conn.peer_host}:{conn.peer_port}</span>
+      ),
+    },
+    {
+      key: "vhost",
+      header: "Vhost",
+      render: (conn) => (
+        <span className="font-mono text-sm text-muted-foreground">{conn.vhost}</span>
+      ),
+    },
+    {
+      key: "protocol",
+      header: "Protocol",
+      render: (conn) => <ProtocolBadge protocol={conn.protocol} />,
+    },
+    {
+      key: "state",
+      header: "State",
+      render: (conn) => <StateBadge state={conn.state} />,
+    },
+    {
+      key: "user",
+      header: "User",
+      render: (conn) => <span>{conn.user}</span>,
+    },
+    {
+      key: "channels",
+      header: "Ch",
+      align: "center",
+      render: (conn) => <span className="font-medium">{conn.channels}</span>,
+    },
+    {
+      key: "connected",
+      header: "Connected",
+      render: (conn) => (
+        <span title={fmtDateFull(conn.connected_at)} className="text-muted-foreground cursor-help">
+          {relativeTime(conn.connected_at)}
+        </span>
+      ),
+    },
+    {
+      key: "rate",
+      header: "↑↓ Rate",
+      render: (conn) => (
+        <RateCell send={conn.send_oct_details?.rate} recv={conn.recv_oct_details?.rate} />
+      ),
+    },
+    {
+      key: "tls",
+      header: "TLS",
+      align: "center",
+      render: (conn) => <SslIcon ssl={conn.ssl} />,
+    },
+  ], []);
+
   return (
     <div className="space-y-6">
       {isError && (
@@ -433,84 +493,19 @@ export default function ConnectionsPage() {
       </div>
 
       {/* table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/50 text-xs uppercase">
-              <TableRow>
-                <TableHead>Client / Name</TableHead>
-                <TableHead>Host</TableHead>
-                <TableHead>Vhost</TableHead>
-                <TableHead>Protocol</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead className="text-center">Ch</TableHead>
-                <TableHead>Connected</TableHead>
-                <TableHead>↑↓ Rate</TableHead>
-                <TableHead className="text-center">TLS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!data ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-6">Loading…</TableCell>
-                </TableRow>
-              ) : paged.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-center py-10">
-                    <p className="text-muted-foreground font-medium">No active connections</p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      {search || stateFilter !== "all" || vhostFilter !== "all" || protoFilter !== "all"
-                        ? "Try adjusting your filters"
-                        : "The broker is idle — no clients connected"}
-                    </p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paged.map((conn) => {
-                  const cn = clientName(conn);
-                  const blocked = isBlocked(conn.state);
-                  return (
-                    <TableRow
-                      key={conn.name}
-                      onClick={() => setSelected(conn)}
-                      className={`cursor-pointer whitespace-nowrap ${blocked ? "bg-rose-50/50 dark:bg-rose-900/10" : ""}`}
-                    >
-                      <TableCell>
-                        <div className="font-medium">{cn || conn.name.split(" ")[0]}</div>
-                        {cn && <div className="text-[11px] text-muted-foreground font-mono truncate max-w-[160px]">{conn.name}</div>}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{conn.peer_host}:{conn.peer_port}</TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">{conn.vhost}</TableCell>
-                      <TableCell><ProtocolBadge protocol={conn.protocol} /></TableCell>
-                      <TableCell><StateBadge state={conn.state} /></TableCell>
-                      <TableCell>{conn.user}</TableCell>
-                      <TableCell className="text-center font-medium">{conn.channels}</TableCell>
-                      <TableCell>
-                        <span title={fmtDateFull(conn.connected_at)} className="text-muted-foreground cursor-help">
-                          {relativeTime(conn.connected_at)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <RateCell send={conn.send_oct_details?.rate} recv={conn.recv_oct_details?.rate} />
-                      </TableCell>
-                      <TableCell className="text-center"><SslIcon ssl={conn.ssl} /></TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* footer */}
-        <div className="px-5 py-3 bg-muted/30 border-t flex justify-between items-center text-xs text-muted-foreground">
-          <span>
-            {filtered.length === 0 ? "0 connections" : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <Pagination page={page} total={filtered.length} onChange={setPage} />
-        </div>
-      </div>
+      <DataTable
+        columns={connColumns}
+        data={pagedData}
+        isLoading={!data}
+        onRowClick={(conn) => setSelected(conn)}
+        getRowClassName={(conn) => isBlocked(conn.state) ? "bg-rose-50/50 dark:bg-rose-900/10 whitespace-nowrap" : "whitespace-nowrap"}
+        page={page}
+        pageCount={pageCount}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        pageSize={PAGE_SIZE}
+        emptyMessage="No active connections"
+      />
 
       {/* detail drawer */}
       {selected && (
