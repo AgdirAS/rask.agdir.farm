@@ -419,7 +419,7 @@ function DetailDrawer({
       trace.clear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, queue.vhost]);
 
   useEffect(() => {
     return () => { void trace.stop(); };
@@ -586,6 +586,7 @@ function DetailDrawer({
         </div>
 
         {/* body */}
+        {tab !== "trace" ? (
         <div className="flex-1 overflow-y-auto p-5">
 
           {/* ── overview ─────────────────────────────────────────────────── */}
@@ -878,12 +879,12 @@ function DetailDrawer({
             </div>
           )}
 
-          {tab === "trace" && (
-            <div className="flex-1 min-h-0 flex flex-col">
-              <TraceTab trace={trace} events={traceEvents} />
-            </div>
-          )}
         </div>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <TraceTab trace={trace} events={traceEvents} />
+          </div>
+        )}
       </div>
     </>
   );
