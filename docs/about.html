@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — Rask</title>
+  <meta name="description" content="About Rask, the open source RabbitMQ management dashboard by Agdir Drift AS." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Mona+Sans:ital,wdth,wght@0,75..125,200..900;1,75..125,200..900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0c0c10; --bg-card: #111118; --border: #1e1e2a;
+      --text: #dcd8cc; --text-dim: #7a7890; --gold: #c9943a; --gold-dim: #8a6020;
+      --green: #4a9e72; --radius: 6px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Mona Sans', sans-serif;
+      font-size: 16px; line-height: 1.7; font-variation-settings: 'wdth' 90;
+      -webkit-font-smoothing: antialiased; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 2rem; }
+    nav { position: sticky; top: 0; z-index: 100; background: rgba(12,12,16,0.85);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    .nav-inner { max-width: 720px; margin: 0 auto; padding: 0 2rem; height: 52px;
+      display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-family: 'Fira Code', monospace; font-size: 0.9rem; color: var(--gold);
+      text-decoration: none; letter-spacing: 0.05em; }
+    .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+    .nav-links a { color: var(--text-dim); text-decoration: none; font-size: 0.8rem;
+      font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.15s; }
+    .nav-links a:hover { color: var(--text); }
+    main { padding: 4rem 0 6rem; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text); }
+    .page-intro { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 3rem; }
+    section { margin-bottom: 2.5rem; }
+    p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 0.75rem; }
+    code { font-family: 'Fira Code', monospace; font-size: 0.8rem;
+      background: #1a1a24; border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.4em; }
+    pre { background: #0d0d14; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; font-family: 'Fira Code', monospace; font-size: 0.78rem;
+      line-height: 1.6; overflow-x: auto; margin: 0.75rem 0; color: #a0c8a0; }
+    .table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; }
+    .table-row { display: flex; gap: 1.5rem; padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .table-row:last-child { border-bottom: none; }
+    .table-label { color: var(--text-dim); width: 220px; shrink: 0; }
+    .table-value { color: var(--text); font-family: 'Fira Code', monospace; font-size: 0.78rem; }
+    a { color: var(--gold-dim); text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: var(--gold); }
+    footer { border-top: 1px solid var(--border); padding: 2rem 0 3rem; margin-top: 4rem; }
+    .footer-inner { max-width: 720px; margin: 0 auto; padding: 0 2rem;
+      display: flex; justify-content: space-between; align-items: center; }
+    .footer-left { font-size: 0.8rem; color: var(--text-dim); line-height: 1.7; }
+    .footer-left a { color: var(--text-dim); }
+    .footer-links { display: flex; gap: 1.25rem; font-size: 0.78rem; }
+    .footer-links a { color: var(--text-dim); text-decoration: none; }
+    .footer-links a:hover { color: var(--text); }
+    @media (max-width: 600px) { .nav-links { display: none; } h1 { font-size: 1.6rem; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">rask/</a>
+    <ul class="nav-links">
+      <li><a href="index.html#quickstart">Quick start</a></li>
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="terms.html">Terms</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="https://github.com/agdir/rask" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+<main>
+
+  <h1>About Rask</h1>
+  <p class="page-intro">
+    An open source RabbitMQ management dashboard by
+    <a href="https://agdir.no" target="_blank" rel="noopener">Agdir Drift AS</a>.
+    Named after Ratatoskr, the Norse messenger squirrel.
+  </p>
+
+  <section>
+    <h2>Why we built it</h2>
+    <p>
+      The native RabbitMQ management UI has not kept pace with how operators actually work.
+      It is functional, but it is also a Relic of 2010 web development — table-heavy, hard to navigate,
+      and impossible to extend. We run RabbitMQ in production and needed something better.
+    </p>
+    <p>
+      Rask is that something better. It gives you a modern interface, real-time message tracing,
+      topology visualisation, a publishing tool, and a cleaner hierarchy — while still proxying
+      directly to the RabbitMQ Management HTTP API, so every capability is available.
+    </p>
+  </section>
+
+  <section>
+    <h2>Who we are</h2>
+    <p>
+      <a href="https://agdir.no" target="_blank" rel="noopener">Agdir Drift AS</a> is a Norwegian
+      farming-as-a-service company based in Arendal, Norway
+      (Krøgenes Bryggevei 19, 4841 Arendal). We build software that helps farmers manage land, assets,
+      and operations. RabbitMQ is part of our infrastructure, and Rask came out of our own frustration with the tooling.
+      We use it in production ourselves, every day.
+    </p>
+  </section>
+
+  <section>
+    <h2>Built with</h2>
+    <p>
+      Rask is built on Next.js 16 + React 19, styled with Tailwind CSS v4 and
+      <a href="https://ui.shadcn.com" target="_blank" rel="noopener">shadcn/ui</a> (Radix UI primitives).
+      Data fetching uses TanStack Query. The topology view uses React Flow. Icons are from Lucide.
+      AMQP operations (publish, peek, purge) run server-side via <code>amqplib</code>.
+      The codebase has unit tests (Vitest) and end-to-end tests (Playwright).
+    </p>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <p>
+      All RabbitMQ Management HTTP API calls are proxied through Next.js API routes.
+      The browser never talks to RabbitMQ directly — which simplifies auth, CORS,
+      and lets you run Rask inside a private network without exposing port 15672.
+    </p>
+    <pre>Browser → Next.js API Routes (/api/rabbitmq/*)
+       → RabbitMQ Management API (port 15672)
+       → RabbitMQ AMQP (port 5672, server-only)</pre>
+    <p>
+      AMQP operations (peek, publish, purge) are performed server-side.
+      The <code>amqplib</code> library never runs in the browser.
+    </p>
+  </section>
+
+  <section>
+    <h2>Configuration</h2>
+    <p>All environment variables are optional. Defaults work with a local RabbitMQ instance.</p>
+    <div class="table">
+      <div class="table-row"><span class="table-label">RABBITMQ_HOST</span><span class="table-value">localhost</span></div>
+      <div class="table-row"><span class="table-label">RABBITMQ_MANAGEMENT_PORT</span><span class="table-value">15672</span></div>
+      <div class="table-row"><span class="table-label">RABBITMQ_AMQP_PORT</span><span class="table-value">5672</span></div>
+      <div class="table-row"><span class="table-label">RABBITMQ_USER</span><span class="table-value">guest</span></div>
+      <div class="table-row"><span class="table-label">RABBITMQ_PASSWORD</span><span class="table-value">guest</span></div>
+      <div class="table-row"><span class="table-label">RABBITMQ_VHOST</span><span class="table-value">/</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>License</h2>
+    <p>
+      Rask is released under the <strong>Business Source License 1.1 (BSL)</strong>.
+      Free for personal, internal, and non-commercial use.
+      Commercial use requires a separate agreement — contact
+      <a href="mailto:sales@agdir.no">sales@agdir.no</a>.
+      See <a href="terms.html">Terms of Use</a> for the full terms.
+    </p>
+  </section>
+
+</main>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      Built by <a href="https://agdir.no" target="_blank" rel="noopener">Agdir Drift AS</a> — farming as a service.<br />
+      Named after Ratatoskr, the Norse messenger squirrel.
+    </div>
+    <div class="footer-links">
+      <a href="about.html">About</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

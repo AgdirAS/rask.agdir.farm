@@ -1,0 +1,72 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in Rask
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in as much detail as possible.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reliably reproduce the behavior.
+      placeholder: |
+        1. Navigate to…
+        2. Click on…
+        3. See error…
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include screenshots or error messages if helpful.
+    validations:
+      required: true
+
+  - type: input
+    id: rabbitmq-version
+    attributes:
+      label: RabbitMQ Version
+      placeholder: "e.g. 4.0.3"
+    validations:
+      required: false
+
+  - type: input
+    id: rask-version
+    attributes:
+      label: Rask Version / Commit
+      placeholder: "e.g. v1.0.0 or git commit hash"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      options:
+        - Docker Compose
+        - Built from source
+        - Other
+    validations:
+      required: false
