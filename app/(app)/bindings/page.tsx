@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── create binding dialog ──────────────────────────────────────────────────────
 
@@ -250,73 +251,78 @@ export default function BindingsPage() {
 
 
       {/* table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-5 py-3">Source Exchange</th>
-                <th className="px-5 py-3">Vhost</th>
-                <th className="px-5 py-3">Destination Queue</th>
-                <th className="px-5 py-3">Routing Key</th>
-                <th className="px-5 py-3">Arguments</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {!data ? (
-                <tr><td colSpan={6} className="px-5 py-6 text-center text-muted-foreground">Loading…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center">
-                    <p className="text-muted-foreground font-medium">No bindings found</p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      {search || vhostFilter !== "all" || sourceFilter !== "all"
-                        ? "Try adjusting your filters"
-                        : "No bindings declared in this broker"}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((b, i) => {
-                  const rowKey = `${b.vhost}/${b.source}/${b.destination}/${b.routing_key}/${i}`;
-                  const delKey = `${b.vhost}/${b.source}/${b.destination}/${b.routing_key}`;
-                  const argCount = Object.keys(b.arguments ?? {}).length;
-                  return (
-                    <tr key={rowKey} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-5 py-3 font-mono text-sm font-medium">
-                        {b.source || <span className="text-muted-foreground italic">(default)</span>}
-                      </td>
-                      <td className="px-5 py-3 font-mono text-sm text-muted-foreground">{b.vhost}</td>
-                      <td className="px-5 py-3 font-mono text-sm">{b.destination}</td>
-                      <td className="px-5 py-3 font-mono text-sm text-muted-foreground">
-                        {b.routing_key || <span className="italic">—</span>}
-                      </td>
-                      <td className="px-5 py-3 text-xs text-muted-foreground">
-                        {argCount > 0 ? (
-                          <span className="px-1.5 py-0.5 bg-muted rounded text-xs">{argCount} arg{argCount > 1 ? "s" : ""}</span>
-                        ) : "—"}
-                      </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          onClick={() => handleDelete(b)}
-                          disabled={deletingKey === delKey}
-                          className="px-2.5 py-1 text-xs text-destructive border border-destructive/30 rounded hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                        >
-                          {deletingKey === delKey ? "…" : "Delete"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-5 py-3 bg-muted/30 border-t text-xs text-muted-foreground">
-          {filtered.length} binding{filtered.length !== 1 ? "s" : ""}
-        </div>
-      </div>
+      {(() => {
+        const bindingColumns: DataTableColumn<Binding>[] = [
+          {
+            key: "source",
+            header: "Source Exchange",
+            render: (b) => (
+              <span className="font-mono text-sm font-medium">
+                {b.source || <span className="text-muted-foreground italic">(default)</span>}
+              </span>
+            ),
+          },
+          {
+            key: "vhost",
+            header: "Vhost",
+            render: (b) => <span className="font-mono text-sm text-muted-foreground">{b.vhost}</span>,
+          },
+          {
+            key: "destination",
+            header: "Destination Queue",
+            render: (b) => <span className="font-mono text-sm">{b.destination}</span>,
+          },
+          {
+            key: "routing_key",
+            header: "Routing Key",
+            render: (b) => (
+              <span className="font-mono text-sm text-muted-foreground">
+                {b.routing_key || <span className="italic">—</span>}
+              </span>
+            ),
+          },
+          {
+            key: "arguments",
+            header: "Arguments",
+            render: (b) => {
+              const argCount = Object.keys(b.arguments ?? {}).length;
+              return argCount > 0 ? (
+                <span className="px-1.5 py-0.5 bg-muted rounded text-xs">{argCount} arg{argCount > 1 ? "s" : ""}</span>
+              ) : <span className="text-muted-foreground">—</span>;
+            },
+          },
+          {
+            key: "actions",
+            header: "",
+            align: "right",
+            render: (b) => {
+              const delKey = `${b.vhost}/${b.source}/${b.destination}/${b.routing_key}`;
+              return (
+                <button
+                  onClick={(e) => { e.stopPropagation(); void handleDelete(b); }}
+                  disabled={deletingKey === delKey}
+                  className="px-2.5 py-1 text-xs text-destructive border border-destructive/30 rounded hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                >
+                  {deletingKey === delKey ? "…" : "Delete"}
+                </button>
+              );
+            },
+          },
+        ];
+        return (
+          <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+            <DataTable
+              columns={bindingColumns}
+              data={filtered}
+              pageSize={0}
+              emptyMessage="No bindings found"
+            />
+            <div className="px-5 py-3 bg-muted/30 border-t text-xs text-muted-foreground">
+              {filtered.length} binding{filtered.length !== 1 ? "s" : ""}
+            </div>
+          </div>
+        );
+      })()}
 
       {showCreate && (
         <CreateBindingDialog
