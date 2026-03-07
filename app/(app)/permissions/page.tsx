@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RabbitUser, VhostPermission, Vhost } from "@/lib/types";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useSetHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── confirmation dialog ───────────────────────────────────────────────────────
 
@@ -173,36 +174,6 @@ function PermissionDrawer({
   );
 }
 
-// ── pagination ────────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 10;
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
-  const visible: (number | "…")[] = [];
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) visible.push(i);
-    else if (visible[visible.length - 1] !== "…") visible.push("…");
-  }
-  return (
-    <div className="flex gap-1">
-      <button onClick={() => onChange(page - 1)} disabled={page === 1}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">‹</button>
-      {visible.map((v, i) =>
-        v === "…"
-          ? <span key={`e${i}`} className="px-2.5 py-1.5 text-muted-foreground">…</span>
-          : <button key={v} onClick={() => onChange(v as number)}
-              className={`px-2.5 py-1.5 border rounded font-medium transition-colors ${v === page ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>
-              {v}
-            </button>
-      )}
-      <button onClick={() => onChange(page + 1)} disabled={page === Math.ceil(total / PAGE_SIZE)}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">›</button>
-    </div>
-  );
-}
-
 // ── main ──────────────────────────────────────────────────────────────────────
 
 export default function PermissionsPage() {
@@ -210,7 +181,6 @@ export default function PermissionsPage() {
 
   const [permUserFilter, setPermUserFilter] = useState("all");
   const [permVhostFilter, setPermVhostFilter] = useState("all");
-  const [permPage, setPermPage] = useState(1);
   const [permDrawer, setPermDrawer] = useState<PermDrawerMode | null>(null);
   const [permDeleteConfirm, setPermDeleteConfirm] = useState<VhostPermission | null>(null);
 
@@ -236,7 +206,7 @@ export default function PermissionsPage() {
     staleTime: Infinity,
   });
 
-  const { data: permissions, isError: permsError } = useQuery<VhostPermission[]>({
+  const { data: permissions, isLoading: permsLoading, isError: permsError } = useQuery<VhostPermission[]>({
     queryKey: ["admin-permissions"],
     queryFn: async () => {
       const res = await fetch("/api/rabbitmq/permissions");
@@ -278,7 +248,10 @@ export default function PermissionsPage() {
     });
   }, [permissions, permUserFilter, permVhostFilter]);
 
-  const pagedPerms = filteredPerms.slice((permPage - 1) * PAGE_SIZE, permPage * PAGE_SIZE);
+  const { pagedData, page, setPage, pageCount } = useDataTable({
+    data: filteredPerms,
+    pageSize: 10,
+  });
 
   // unique vhosts for filter
   const permVhosts = useMemo(() => {
@@ -298,6 +271,77 @@ export default function PermissionsPage() {
     qc.invalidateQueries({ queryKey: ["admin-permissions"] });
     setPermDrawer(null);
   }
+
+  const columns: DataTableColumn<VhostPermission>[] = [
+    {
+      key: "user",
+      header: "User",
+      render: (perm) => (
+        <div className="flex items-center gap-1.5 font-medium">
+          {perm.user}
+          {perm.user === whoami && (
+            <span className="px-1 py-0.5 bg-muted text-muted-foreground text-[10px] rounded font-bold uppercase tracking-wider">You</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "vhost",
+      header: "Vhost",
+      render: (perm) => <span className="text-muted-foreground">{perm.vhost}</span>,
+    },
+    {
+      key: "configure",
+      header: "Configure",
+      render: (perm) => perm.configure ? (
+        <code className={`text-xs font-mono px-1.5 py-0.5 rounded ${perm.configure === ".*" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-muted text-foreground"}`}>
+          {perm.configure}
+        </code>
+      ) : (
+        <span className="text-muted-foreground/40 italic text-xs">empty</span>
+      ),
+    },
+    {
+      key: "write",
+      header: "Write",
+      render: (perm) => perm.write ? (
+        <code className={`text-xs font-mono px-1.5 py-0.5 rounded ${perm.write === ".*" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-muted text-foreground"}`}>
+          {perm.write}
+        </code>
+      ) : (
+        <span className="text-muted-foreground/40 italic text-xs">empty</span>
+      ),
+    },
+    {
+      key: "read",
+      header: "Read",
+      render: (perm) => perm.read ? (
+        <code className={`text-xs font-mono px-1.5 py-0.5 rounded ${perm.read === ".*" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-muted text-foreground"}`}>
+          {perm.read}
+        </code>
+      ) : (
+        <span className="text-muted-foreground/40 italic text-xs">empty</span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (perm) => (
+        <div className="flex justify-end gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); setPermDeleteConfirm(perm); }}
+            className="p-1.5 rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            title="Delete permission"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4 H14 M5 4 V2.5 H11 V4 M6 7 V12 M10 7 V12 M3 4 L4 14 H12 L13 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -328,7 +372,7 @@ export default function PermissionsPage() {
 
       {/* filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <Select value={permUserFilter} onValueChange={(v) => { setPermUserFilter(v); setPermPage(1); }}>
+        <Select value={permUserFilter} onValueChange={(v) => { setPermUserFilter(v); setPage(1); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
@@ -337,7 +381,7 @@ export default function PermissionsPage() {
             {(users ?? []).map((u) => <SelectItem key={u.name} value={u.name}>{u.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={permVhostFilter} onValueChange={(v) => { setPermVhostFilter(v); setPermPage(1); }}>
+        <Select value={permVhostFilter} onValueChange={(v) => { setPermVhostFilter(v); setPage(1); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
@@ -348,87 +392,23 @@ export default function PermissionsPage() {
         </Select>
       </div>
 
-      {/* permissions table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-6 py-3">User</th>
-                <th className="px-6 py-3">Vhost</th>
-                <th className="px-6 py-3 font-mono">Configure</th>
-                <th className="px-6 py-3 font-mono">Write</th>
-                <th className="px-6 py-3 font-mono">Read</th>
-                <th className="px-6 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {!permissions ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>
-              ) : pagedPerms.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No permissions found</td></tr>
-              ) : (
-                pagedPerms.map((perm) => {
-                  const noAccess = !perm.configure && !perm.write && !perm.read;
-                  return (
-                    <tr key={`${perm.user}|${perm.vhost}`}
-                      className={`transition-colors ${noAccess ? "bg-amber-50/40 dark:bg-amber-900/5 hover:bg-amber-50 dark:hover:bg-amber-900/10" : "hover:bg-muted/30"}`}>
-                      <td className="px-6 py-4 font-medium">
-                        <div className="flex items-center gap-1.5">
-                          {perm.user}
-                          {perm.user === whoami && (
-                            <span className="px-1 py-0.5 bg-muted text-muted-foreground text-[10px] rounded font-bold uppercase tracking-wider">You</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">{perm.vhost}</td>
-                      {[perm.configure, perm.write, perm.read].map((val, idx) => (
-                        <td key={idx} className="px-6 py-4">
-                          {val ? (
-                            <code className={`text-xs font-mono px-1.5 py-0.5 rounded ${val === ".*" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-muted text-foreground"}`}>
-                              {val}
-                            </code>
-                          ) : (
-                            <span className="text-muted-foreground/40 italic text-xs">empty</span>
-                          )}
-                        </td>
-                      ))}
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            onClick={() => setPermDrawer({ mode: "edit", perm })}
-                            className="p-1.5 rounded text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                              <path d="M11 2 L14 5 L5 14 H2 V11 L11 2Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => setPermDeleteConfirm(perm)}
-                            className="p-1.5 rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                              <path d="M2 4 H14 M5 4 V2.5 H11 V4 M6 7 V12 M10 7 V12 M3 4 L4 14 H12 L13 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-6 py-3 bg-muted/30 border-t flex justify-between items-center text-sm text-muted-foreground">
-          <span>
-            {filteredPerms.length === 0
-              ? "No permissions"
-              : `Showing ${(permPage - 1) * PAGE_SIZE + 1}–${Math.min(permPage * PAGE_SIZE, filteredPerms.length)} of ${filteredPerms.length}`}
-          </span>
-          <Pagination page={permPage} total={filteredPerms.length} onChange={setPermPage} />
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={pagedData}
+        isLoading={permsLoading}
+        onRowClick={(p) => setPermDrawer({ mode: "edit", perm: p })}
+        getRowClassName={(perm) =>
+          perm.configure === "" && perm.write === "" && perm.read === ""
+            ? "bg-amber-50/60 dark:bg-amber-900/10"
+            : ""
+        }
+        pageSize={10}
+        page={page}
+        pageCount={pageCount}
+        totalCount={filteredPerms.length}
+        onPageChange={setPage}
+        emptyMessage="No permissions found"
+      />
     </div>
   );
 }
