@@ -52,10 +52,12 @@ jobs:
         id: ver
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          REPO: ${{ github.repository }}
         run: |
           VERSION="1.0.${RUN_NUMBER}"
           npm version "$VERSION" --no-git-tag-version
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/$(echo "$REPO" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -68,8 +70,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.ver.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+            ${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}
+            ${{ steps.ver.outputs.image }}:latest
 
   e2e:
     name: E2E Tests
