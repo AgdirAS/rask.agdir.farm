@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Use — Rask</title>
+  <meta name="description" content="Rask is released under the Business Source License 1.1. Free for internal use. Commercial use requires a license." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Mona+Sans:ital,wdth,wght@0,75..125,200..900;1,75..125,200..900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0c0c10; --bg-card: #111118; --border: #1e1e2a;
+      --text: #dcd8cc; --text-dim: #7a7890; --gold: #c9943a; --gold-dim: #8a6020;
+      --green: #4a9e72; --amber: #c9943a; --radius: 6px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Mona Sans', sans-serif;
+      font-size: 16px; line-height: 1.7; font-variation-settings: 'wdth' 90;
+      -webkit-font-smoothing: antialiased; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 2rem; }
+    nav { position: sticky; top: 0; z-index: 100; background: rgba(12,12,16,0.85);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    .nav-inner { max-width: 720px; margin: 0 auto; padding: 0 2rem; height: 52px;
+      display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-family: 'Fira Code', monospace; font-size: 0.9rem; color: var(--gold);
+      text-decoration: none; letter-spacing: 0.05em; }
+    .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+    .nav-links a { color: var(--text-dim); text-decoration: none; font-size: 0.8rem;
+      font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.15s; }
+    .nav-links a:hover { color: var(--text); }
+    main { padding: 4rem 0 6rem; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text); }
+    .page-intro { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 3rem; }
+    section { margin-bottom: 2.5rem; }
+    p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 0.75rem; }
+    strong { color: var(--text); }
+    .table { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin: 0.75rem 0; }
+    .table-row { display: flex; gap: 1.5rem; padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .table-row:last-child { border-bottom: none; }
+    .table-label { color: var(--text-dim); width: 160px; flex-shrink: 0; }
+    .table-value { color: var(--text); }
+    .callout { background: #111118; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin: 0.75rem 0; }
+    .callout p { margin-bottom: 0.5rem; }
+    .callout p:last-child { margin-bottom: 0; }
+    ul.check { list-style: none; padding: 0; }
+    ul.check li { display: flex; gap: 0.75rem; font-size: 0.9rem; color: var(--text-dim);
+      margin-bottom: 0.5rem; }
+    ul.check li::before { content: "✓"; color: var(--green); flex-shrink: 0; }
+    ul.dash li::before { content: "—"; color: var(--amber); flex-shrink: 0; }
+    a { color: var(--gold-dim); text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: var(--gold); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    footer { border-top: 1px solid var(--border); padding: 2rem 0 3rem; margin-top: 4rem; }
+    .footer-inner { max-width: 720px; margin: 0 auto; padding: 0 2rem;
+      display: flex; justify-content: space-between; align-items: center; }
+    .footer-left { font-size: 0.8rem; color: var(--text-dim); line-height: 1.7; }
+    .footer-left a { color: var(--text-dim); }
+    .footer-links { display: flex; gap: 1.25rem; font-size: 0.78rem; }
+    .footer-links a { color: var(--text-dim); text-decoration: none; }
+    .footer-links a:hover { color: var(--text); }
+    @media (max-width: 600px) { .nav-links { display: none; } h1 { font-size: 1.6rem; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">rask/</a>
+    <ul class="nav-links">
+      <li><a href="index.html#quickstart">Quick start</a></li>
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="terms.html">Terms</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="https://github.com/agdir/rask" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+<main>
+
+  <h1>Terms of Use</h1>
+  <p class="page-intro">
+    Rask is source-available software. These terms describe what you can do with it and what requires a commercial agreement.
+  </p>
+
+  <section>
+    <h2>License</h2>
+    <p>
+      Rask is licensed under the <strong>Business Source License 1.1 (BSL 1.1)</strong>,
+      a source-available license that allows free use for most purposes while protecting the
+      commercial interests of the project during its active development phase.
+    </p>
+    <div class="table">
+      <div class="table-row"><span class="table-label">Licensor</span><span class="table-value">Agdir Drift AS</span></div>
+      <div class="table-row"><span class="table-label">Licensed Work</span><span class="table-value">Rask — all versions</span></div>
+      <div class="table-row"><span class="table-label">Change License</span><span class="table-value">MIT License</span></div>
+      <div class="table-row"><span class="table-label">Change Date</span><span class="table-value">Four years from each release date</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What you can do for free</h2>
+    <ul class="check">
+      <li>Run Rask inside your own organisation to manage your RabbitMQ brokers.</li>
+      <li>Deploy Rask on private infrastructure — cloud VMs, on-premises servers, Kubernetes — for internal use.</li>
+      <li>Modify the source code to fit your team's needs.</li>
+      <li>Contribute patches and improvements back to the project.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>What requires a commercial license</h2>
+    <ul class="check dash">
+      <li>Offering Rask (or a substantially derived product) as a hosted service to third parties.</li>
+      <li>Bundling or distributing Rask as part of a commercial software product or SaaS offering.</li>
+      <li>White-labelling Rask and reselling it under a different product name.</li>
+    </ul>
+    <p style="margin-top: 1rem;">
+      If you are uncertain whether your use case requires a commercial license, contact us and we will clarify.
+    </p>
+  </section>
+
+  <section>
+    <h2>Commercial licensing</h2>
+    <p>
+      Commercial licenses are available for organisations that want to use Rask in products or services
+      offered to third parties, or for teams that want enterprise support, priority feature development,
+      or SLA-backed agreements.
+    </p>
+    <p><strong>Pricing is not published.</strong> Contact our sales team to discuss your requirements:</p>
+    <div class="callout">
+      <p><strong>Agdir Drift AS</strong></p>
+      <p>Krøgenes Bryggevei 19, 4841 Arendal, Norway</p>
+      <p><a href="mailto:sales@agdir.no">sales@agdir.no</a></p>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <h2>Third-party software</h2>
+    <p>
+      Rask is built on and distributes third-party open source software, including
+      Next.js, React, Tailwind CSS, shadcn/ui, TanStack Query, Radix UI, amqplib,
+      Lucide icons, React Flow, and others. Each component is used in accordance with its
+      respective license (MIT or Apache 2.0 unless otherwise noted).
+    </p>
+    <p>
+      Rask is designed to connect to <strong>RabbitMQ</strong>, which is developed and maintained by
+      Broadcom Inc. under the Mozilla Public License. Rask has no affiliation with Broadcom or the
+      RabbitMQ project. Use of RabbitMQ is subject to
+      <a href="https://www.rabbitmq.com/terms-and-conditions" target="_blank" rel="noopener">RabbitMQ's own terms</a>.
+    </p>
+  </section>
+
+  <section>
+    <h2>No warranty</h2>
+    <p>
+      Rask is provided <strong>"as is"</strong>, without warranty of any kind, express or implied.
+      Agdir Drift AS is not responsible for any damages, data loss, downtime, security incidents,
+      or other consequences arising from the use or inability to use this software.
+      You use Rask at your own risk.
+    </p>
+    <p>
+      We make no guarantees about correctness, uptime, compatibility with your RabbitMQ version,
+      or fitness for any particular purpose. Assess the risks before deploying in production.
+    </p>
+  </section>
+
+  <section>
+    <h2>Change date</h2>
+    <p>
+      Each version of Rask automatically converts to the <strong>MIT License</strong> four years after
+      its release date. At that point, all BSL restrictions on that version are lifted and it becomes
+      fully open source. This ensures that the project's long-term future remains open regardless of
+      any commercial decisions made during the active development phase.
+    </p>
+  </section>
+
+  <section>
+    <h2>Governing law</h2>
+    <p>
+      These terms are governed by the laws of Norway. Any disputes shall be resolved in the courts of Norway,
+      with Oslo District Court as the agreed venue.
+    </p>
+    <p>
+      Agdir Drift AS is a Norwegian limited company (organisasjonsnummer 928 476 895),
+      Krøgenes Bryggevei 19, 4841 Arendal, Agder, Norway.
+    </p>
+  </section>
+
+</main>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      Built by <a href="https://agdir.no" target="_blank" rel="noopener">Agdir Drift AS</a> — farming as a service.<br />
+      Named after Ratatoskr, the Norse messenger squirrel.
+    </div>
+    <div class="footer-links">
+      <a href="about.html">About</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
