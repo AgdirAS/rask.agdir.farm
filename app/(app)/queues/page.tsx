@@ -6,12 +6,12 @@ import type { Queue, ConsumerDetail, QueueMessage, Binding } from "@/lib/types";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Activity } from "lucide-react";
+import { Plus } from "lucide-react";
 import { fmtBytes, fmtRate, fmtCount } from "@/lib/utils";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
 import { useTraceStream } from "@/lib/use-trace-stream";
-import { TraceSidebar, type TraceSidebarEntity } from "@/components/trace-sidebar";
+import { TraceTab } from "@/components/trace-tab";
 
 function getArg<T>(args: Record<string, unknown>, key: string): T | undefined {
   return args[key] as T | undefined;
@@ -379,7 +379,7 @@ function CreateQueueDialog({
 
 // ── detail drawer ─────────────────────────────────────────────────────────────
 
-type DrawerTab = "overview" | "consumers" | "messages" | "actions";
+type DrawerTab = "overview" | "consumers" | "messages" | "actions" | "trace";
 
 function DetailDrawer({
   queue,
@@ -405,6 +405,26 @@ function DetailDrawer({
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const trace = useTraceStream();
+  const traceEvents = trace.events.filter(
+    (e) => e.queue === queue.name || e.routingKey === queue.name
+  );
+
+  useEffect(() => {
+    if (tab === "trace") {
+      void trace.start(queue.vhost);
+    } else {
+      void trace.stop();
+      trace.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  useEffect(() => {
+    return () => { void trace.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const dlx = getArg<string>(queue.arguments ?? {}, "x-dead-letter-exchange");
   const ttl = getArg<number>(queue.arguments ?? {}, "x-message-ttl");
@@ -524,6 +544,7 @@ function DetailDrawer({
     { id: "consumers", label: `Consumers (${queue.consumers})` },
     { id: "messages", label: "Messages" },
     { id: "actions", label: "Publish / Actions" },
+    { id: "trace", label: trace.active ? "Live Trace ●" : "Live Trace" },
   ];
 
   return (
@@ -856,6 +877,12 @@ function DetailDrawer({
               </div>
             </div>
           )}
+
+          {tab === "trace" && (
+            <div className="flex-1 min-h-0 flex flex-col">
+              <TraceTab trace={trace} events={traceEvents} />
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -877,8 +904,6 @@ export default function QueuesPage() {
   const [page, setPage]           = useState(1);
   const [selectedKey, setSelectedKey] = useState<{ vhost: string; name: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [tracedEntity, setTracedEntity] = useState<TraceSidebarEntity | null>(null);
-  const trace = useTraceStream();
 
   const { data, isError, error } = useQuery<Queue[]>({
     queryKey: ["queues"],
@@ -1003,15 +1028,14 @@ export default function QueuesPage() {
                 <th className="px-5 py-3 text-right">In</th>
                 <th className="px-5 py-3 text-right">Deliver</th>
                 <th className="px-5 py-3 text-right">Memory</th>
-                <th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {!data ? (
-                <tr><td colSpan={11} className="px-5 py-6 text-center text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={10} className="px-5 py-6 text-center text-muted-foreground">Loading…</td></tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-5 py-10 text-center">
+                  <td colSpan={10} className="px-5 py-10 text-center">
                     <p className="text-muted-foreground font-medium">No queues found</p>
                     <p className="text-muted-foreground text-xs mt-1">
                       {search || vhostFilter !== "all" || typeFilter !== "all" || stateFilter !== "all"
@@ -1053,18 +1077,6 @@ export default function QueuesPage() {
                       <td className="px-5 py-3 text-right font-mono text-muted-foreground">
                         {fmtBytes(q.memory ?? 0)}
                       </td>
-                      <td className="px-5 py-3">
-                        <button
-                          title="Live trace"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTracedEntity({ type: "queue", name: q.name, vhost: q.vhost });
-                          }}
-                          className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                        >
-                          <Activity className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
@@ -1099,11 +1111,6 @@ export default function QueuesPage() {
           onCreated={() => void queryClient.invalidateQueries({ queryKey: ["queues"] })}
         />
       )}
-      <TraceSidebar
-        entity={tracedEntity}
-        trace={trace}
-        onClose={() => setTracedEntity(null)}
-      />
     </div>
   );
 }
