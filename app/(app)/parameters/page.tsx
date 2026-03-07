@@ -6,6 +6,7 @@ import type { GlobalParameter } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useSetHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,43 @@ export default function ParametersPage() {
 
   function openEdit(p: GlobalParameter) { setEditing(p); setDrawerOpen(true); }
 
+  const columns: DataTableColumn<GlobalParameter>[] = [
+    {
+      key: "name",
+      header: "Name",
+      render: (p) => <span className="font-mono font-medium">{p.name}</span>,
+    },
+    {
+      key: "component",
+      header: "Component",
+      render: (p) => <span className="text-muted-foreground font-mono text-xs">{p.component || "—"}</span>,
+    },
+    {
+      key: "value",
+      header: "Value",
+      render: (p) => (
+        <pre className="text-xs font-mono text-muted-foreground truncate max-w-xs">{safeJsonStringify(p.value)}</pre>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (p) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); void handleDelete(p.name); }}
+          disabled={deleting === p.name}
+          className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
+          title="Delete"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+            <path d="M3 5h10M6 5V3h4v2M7 8v4M9 8v4M4 5l1 9h6l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col h-full">
       {/* Content */}
@@ -177,60 +215,13 @@ export default function ParametersPage() {
           </div>
         )}
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-5 py-2 text-left font-medium">Name</th>
-              <th className="px-5 py-2 text-left font-medium">Component</th>
-              <th className="px-5 py-2 text-left font-medium">Value</th>
-              <th className="px-5 py-2 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {!params ? (
-              <tr><td colSpan={4} className="px-5 py-6 text-center text-muted-foreground">Loading…</td></tr>
-            ) : params.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-5 py-10 text-center">
-                  <p className="text-muted-foreground font-medium">No global parameters configured</p>
-                </td>
-              </tr>
-            ) : (
-              params.map((p) => (
-                <tr key={p.name} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-5 py-3 font-mono font-medium">{p.name}</td>
-                  <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{p.component || "—"}</td>
-                  <td className="px-5 py-3 max-w-xs">
-                    <pre className="text-xs font-mono text-muted-foreground truncate">{safeJsonStringify(p.value)}</pre>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-colors"
-                        title="Edit"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                          <path d="M11.5 2.5L13.5 4.5L5.5 12.5H3.5V10.5L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.name)}
-                        disabled={deleting === p.name}
-                        className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                          <path d="M3 5h10M6 5V3h4v2M7 8v4M9 8v4M4 5l1 9h6l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          columns={columns}
+          data={params ?? []}
+          isLoading={!params}
+          pageSize={0}
+          onRowClick={(p) => openEdit(p)}
+        />
       </div>
 
       {drawerOpen && (
