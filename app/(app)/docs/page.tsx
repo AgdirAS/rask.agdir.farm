@@ -13,7 +13,8 @@ export default function DocsPage() {
           <a href="https://agdir.no" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
             Agdir Drift AS
           </a>
-          {" "}because the native RabbitMQ management UI has not kept pace with how operators actually work.
+          {" "}(Krøgenes Bryggevei 19, 4841 Arendal, Norway) because the native RabbitMQ management UI has not kept
+          pace with how operators actually work. We use it in production ourselves, every day.
         </p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Rask is a drop-in replacement for the built-in RabbitMQ management plugin UI. It adds real-time tracing,
