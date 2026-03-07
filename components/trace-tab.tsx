@@ -40,11 +40,17 @@ export function TraceTab({ trace, events }: Props) {
               className={`px-3 py-2 border-b hover:bg-muted/30 ${
                 e.type === "publish"
                   ? "border-l-2 border-l-violet-400"
-                  : "border-l-2 border-l-emerald-400"
+                  : e.type === "drop"
+                    ? "border-l-2 border-l-rose-400"
+                    : "border-l-2 border-l-emerald-400"
               }`}
             >
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-0.5">
-                <span className={e.type === "publish" ? "text-violet-500 font-semibold" : "text-emerald-500 font-semibold"}>
+                <span className={e.type === "publish"
+                  ? "text-violet-500 font-semibold"
+                  : e.type === "drop"
+                    ? "text-rose-500 font-semibold"
+                    : "text-emerald-500 font-semibold"}>
                   {e.type}
                 </span>
                 <span>{new Date(e.timestamp).toLocaleTimeString()}</span>
