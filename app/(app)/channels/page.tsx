@@ -7,9 +7,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
-import { Activity } from "lucide-react";
 import { useTraceStream } from "@/lib/use-trace-stream";
-import { TraceSidebar, type TraceSidebarEntity } from "@/components/trace-sidebar";
+import { TraceTab } from "@/components/trace-tab";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +59,32 @@ function DetailDrawer({ channel, onClose }: { channel: Channel; onClose: () => v
   const mode = channelMode(channel);
   const connName = channel.connection_details?.name ?? channel.name;
 
+  type ChannelTab = "overview" | "trace";
+  const [tab, setTab] = useState<ChannelTab>("overview");
+  const trace = useTraceStream();
+  // channels: trace events don't carry channel metadata, show global vhost feed
+  const traceEvents = trace.events;
+
+  useEffect(() => {
+    if (tab === "trace") {
+      void trace.start(channel.vhost);
+    } else {
+      void trace.stop();
+      trace.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, channel.vhost]);
+
+  useEffect(() => {
+    return () => { void trace.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset to overview when a different channel is opened
+  useEffect(() => {
+    setTab("overview");
+  }, [channel.name]);
+
   return (
     <>
       {/* backdrop */}
@@ -84,73 +109,92 @@ function DetailDrawer({ channel, onClose }: { channel: Channel; onClose: () => v
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* state + mode */}
-          <div className="flex gap-2">
-            <StateBadge state={channel.state} />
-            <ModeBadge mode={mode} />
-          </div>
-
-          {/* key fields */}
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <div>
-              <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Connection</dt>
-              <dd className="font-medium break-all text-xs">{connName}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Vhost</dt>
-              <dd className="font-medium">{channel.vhost}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">User</dt>
-              <dd className="font-medium">{channel.user}</dd>
-            </div>
-            <div>
-              <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Consumers</dt>
-              <dd className="font-medium">{channel.consumer_count}</dd>
-            </div>
-          </dl>
-
-          {/* message stats */}
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground">Message Counters</p>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground uppercase font-semibold">Unacknowledged</span>
-                <span className={`text-xl font-bold tabular-nums ${channel.messages_unacknowledged > 0 ? "text-amber-500" : ""}`}>
-                  {channel.messages_unacknowledged.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground uppercase font-semibold">Uncommitted</span>
-                <span className="text-xl font-bold tabular-nums">
-                  {(channel.messages_uncommitted ?? 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground uppercase font-semibold">Acks Uncommitted</span>
-                <span className="text-xl font-bold tabular-nums">
-                  {(channel.acks_uncommitted ?? 0).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* prefetch */}
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground">Prefetch</p>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground uppercase font-semibold">Per-Consumer</span>
-                <span className="text-xl font-bold tabular-nums">{channel.prefetch_count}</span>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-muted-foreground uppercase font-semibold">Global</span>
-                <span className="text-xl font-bold tabular-nums">{channel.global_prefetch_count ?? 0}</span>
-              </div>
-            </div>
-          </div>
+        {/* Tab bar */}
+        <div className="flex border-b bg-muted/30 px-4 shrink-0">
+          {(["overview", "trace"] as ChannelTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {t === "overview" ? "Overview" : trace.active ? "Live Trace ●" : "Live Trace"}
+            </button>
+          ))}
         </div>
+
+        {tab !== "trace" ? (
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {/* state + mode */}
+            <div className="flex gap-2">
+              <StateBadge state={channel.state} />
+              <ModeBadge mode={mode} />
+            </div>
+
+            {/* key fields */}
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              <div>
+                <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Connection</dt>
+                <dd className="font-medium break-all text-xs">{connName}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Vhost</dt>
+                <dd className="font-medium">{channel.vhost}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">User</dt>
+                <dd className="font-medium">{channel.user}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">Consumers</dt>
+                <dd className="font-medium">{channel.consumer_count}</dd>
+              </div>
+            </dl>
+
+            {/* message stats */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground">Message Counters</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Unacknowledged</span>
+                  <span className={`text-xl font-bold tabular-nums ${channel.messages_unacknowledged > 0 ? "text-amber-500" : ""}`}>
+                    {channel.messages_unacknowledged.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Uncommitted</span>
+                  <span className="text-xl font-bold tabular-nums">
+                    {(channel.messages_uncommitted ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Acks Uncommitted</span>
+                  <span className="text-xl font-bold tabular-nums">
+                    {(channel.acks_uncommitted ?? 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* prefetch */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground">Prefetch</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Per-Consumer</span>
+                  <span className="text-xl font-bold tabular-nums">{channel.prefetch_count}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Global</span>
+                  <span className="text-xl font-bold tabular-nums">{channel.global_prefetch_count ?? 0}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <TraceTab trace={trace} events={traceEvents} />
+          </div>
+        )}
       </aside>
     </>
   );
@@ -240,8 +284,6 @@ export default function ChannelsPage() {
   const [selected, setSelected] = useState<Channel | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [tracedEntity, setTracedEntity] = useState<TraceSidebarEntity | null>(null);
-  const trace = useTraceStream();
 
   const { data, isError, error } = useQuery<Channel[]>({
     queryKey: ["channels"],
@@ -358,17 +400,16 @@ export default function ChannelsPage() {
                 <SortTh label="Prefetch" sortKey="prefetch_count" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3 text-right" />
                 <SortTh label="Consumers" sortKey="consumer_count" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3 text-right" />
                 <th className="px-6 py-3 text-center">Mode</th>
-                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {!data ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-muted-foreground">Loading…</td>
+                  <td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">Loading…</td>
                 </tr>
               ) : paged.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <p className="text-muted-foreground font-medium">No open channels</p>
                     <p className="text-muted-foreground/60 text-xs mt-1">Channels appear when AMQP clients connect and open them.</p>
                   </td>
@@ -408,18 +449,6 @@ export default function ChannelsPage() {
                       <td className="px-6 py-4 text-center">
                         <ModeBadge mode={mode} />
                       </td>
-                      <td className="px-6 py-4">
-                        <button
-                          title="Live trace (global feed)"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTracedEntity({ type: "channel", name: ch.name, vhost: ch.vhost });
-                          }}
-                          className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                        >
-                          <Activity className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
@@ -438,11 +467,6 @@ export default function ChannelsPage() {
           <Pagination page={page} total={filtered.length} onChange={setPage} />
         </div>
       </div>
-      <TraceSidebar
-        entity={tracedEntity}
-        trace={trace}
-        onClose={() => setTracedEntity(null)}
-      />
     </div>
   );
 }
