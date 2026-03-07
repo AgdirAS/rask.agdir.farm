@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -699,34 +700,6 @@ function DetailDrawer({
   );
 }
 
-// ── pagination ────────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 20;
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
-  const visible: (number | "...")[] = [];
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) visible.push(i);
-    else if (visible[visible.length - 1] !== "...") visible.push("...");
-  }
-  return (
-    <div className="flex gap-1 text-sm">
-      <button onClick={() => onChange(page - 1)} disabled={page === 1}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">&#8249;</button>
-      {visible.map((v, i) =>
-        v === "..."
-          ? <span key={`e${i}`} className="px-2.5 py-1.5 text-muted-foreground">...</span>
-          : <button key={v} onClick={() => onChange(v as number)}
-              className={`px-2.5 py-1.5 border rounded font-medium transition-colors ${v === page ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>{v}</button>
-      )}
-      <button onClick={() => onChange(page + 1)} disabled={page === Math.ceil(total / PAGE_SIZE)}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">&#8250;</button>
-    </div>
-  );
-}
-
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function PoliciesPage() {
@@ -735,7 +708,6 @@ export default function PoliciesPage() {
   const [search, setSearch]         = useState("");
   const [vhostFilter, setVhost]     = useState("all");
   const [applyFilter, setApply]     = useState("all");
-  const [page, setPage]             = useState(1);
   const [selectedKey, setSelectedKey] = useState<{ vhost: string; name: string } | null>(null);
   const [editingPolicy, setEditingPolicy] = useState<Partial<Policy> | null | false>(false); // false = closed, null = new, Policy = edit
 
@@ -796,10 +768,10 @@ export default function PoliciesPage() {
             className="pl-9 pr-3 py-1.5 bg-background border rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary w-48"
             placeholder="Search…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); }}
           />
         </div>
-        <Select value={vhostFilter} onValueChange={(v) => { setVhost(v); setPage(1); }}>
+        <Select value={vhostFilter} onValueChange={(v) => { setVhost(v); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Vhost: All" />
           </SelectTrigger>
@@ -808,7 +780,7 @@ export default function PoliciesPage() {
             {vhostNames.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={applyFilter} onValueChange={(v) => { setApply(v); setPage(1); }}>
+        <Select value={applyFilter} onValueChange={(v) => { setApply(v); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Apply To: All" />
           </SelectTrigger>
@@ -838,7 +810,111 @@ export default function PoliciesPage() {
     });
   }, [policies, search, vhostFilter, applyFilter]);
 
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { sortKey, sortDir, toggleSort, page, setPage, pageCount, pagedData, totalCount } = useDataTable<Policy>({
+    data: filtered,
+    pageSize: 20,
+    defaultSortKey: "name",
+    defaultSortDir: "asc",
+    getSortValue: (p, key) => {
+      if (key === "priority") return p.priority;
+      if (key === "name") return p.name;
+      if (key === "vhost") return p.vhost;
+      if (key === "pattern") return p.pattern;
+      if (key === "apply-to") return p["apply-to"];
+      return "";
+    },
+  });
+
+  const columns: DataTableColumn<Policy>[] = useMemo(() => [
+    {
+      key: "status",
+      header: "Status",
+      render: (p) => {
+        const key = `${p.vhost}/${p.name}`;
+        const status = statuses.get(key) ?? "active";
+        return <StatusBadge status={status} />;
+      },
+    },
+    {
+      key: "priority",
+      header: "Priority",
+      sortable: true,
+      align: "center",
+      render: (p) => <span className="font-mono font-semibold">{p.priority}</span>,
+    },
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      render: (p) => <span className="font-medium">{p.name}</span>,
+    },
+    {
+      key: "vhost",
+      header: "Vhost",
+      sortable: true,
+      render: (p) => <span className="font-mono text-muted-foreground text-xs">{p.vhost}</span>,
+    },
+    {
+      key: "pattern",
+      header: "Pattern",
+      sortable: true,
+      render: (p) => (
+        <span className="font-mono text-xs max-w-[160px] truncate block" title={p.pattern}>{p.pattern}</span>
+      ),
+    },
+    {
+      key: "apply-to",
+      header: "Apply To",
+      sortable: true,
+      render: (p) => <ApplyBadge applyTo={p["apply-to"]} />,
+    },
+    {
+      key: "definition",
+      header: "Definition",
+      render: (p) => (
+        <span className="text-muted-foreground text-xs max-w-[200px] truncate block" title={JSON.stringify(p.definition)}>
+          {defSummary(p.definition) || <span className="italic">empty</span>}
+        </span>
+      ),
+    },
+    {
+      key: "matches",
+      header: "Matches",
+      align: "right",
+      render: (p) => {
+        const regex = safeRegex(p.pattern);
+        const matchCount = regex
+          ? (p["apply-to"] !== "exchanges" ? queues.filter((q) => q.vhost === p.vhost && regex.test(q.name)).length : 0)
+            + (p["apply-to"] !== "queues" ? exchanges.filter((e) => e.vhost === p.vhost && regex.test(e.name)).length : 0)
+          : 0;
+        return <span className="font-mono">{matchCount}</span>;
+      },
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (p) => (
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setEditingPolicy(p)}
+            className="px-2.5 py-1 text-xs border rounded hover:bg-muted transition-colors"
+          >
+            Edit
+          </button>
+          <button
+            onClick={async () => {
+              if (!confirm(`Delete policy "${p.name}"?`)) return;
+              await fetch(`/api/rabbitmq/policies/${encodeURIComponent(p.vhost)}/${encodeURIComponent(p.name)}`, { method: "DELETE" });
+              await queryClient.invalidateQueries({ queryKey: ["policies"] });
+            }}
+            className="px-2.5 py-1 text-xs border border-destructive/30 text-destructive rounded hover:bg-destructive/10 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ], [statuses, queues, exchanges, queryClient]);
 
   const forQueues    = useMemo(() => policies?.filter((p) => ["queues", "classic_queues", "quorum_queues", "streams", "all"].includes(p["apply-to"])).length ?? 0, [policies]);
   const forExchanges = useMemo(() => policies?.filter((p) => ["exchanges", "all"].includes(p["apply-to"])).length ?? 0, [policies]);
@@ -884,100 +960,21 @@ export default function PoliciesPage() {
       </div>
 
       {/* table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-center">Priority</th>
-                <th className="px-5 py-3">Name</th>
-                <th className="px-5 py-3">Vhost</th>
-                <th className="px-5 py-3">Pattern</th>
-                <th className="px-5 py-3">Apply To</th>
-                <th className="px-5 py-3">Definition</th>
-                <th className="px-5 py-3 text-right">Matches</th>
-                <th className="px-5 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {!policies ? (
-                <tr><td colSpan={9} className="px-5 py-6 text-center text-muted-foreground">Loading...</td></tr>
-              ) : paged.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center">
-                    <p className="text-muted-foreground font-medium">No policies configured</p>
-                    <p className="text-muted-foreground text-xs mt-1 max-w-sm mx-auto">
-                      Policies apply TTL, DLX, max-length, and other rules automatically to queues and exchanges matching a regexp pattern.
-                    </p>
-                    <button
-                      onClick={() => setEditingPolicy(null)}
-                      className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-                    >
-                      Add your first policy
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                paged.map((p) => {
-                  const key = `${p.vhost}/${p.name}`;
-                  const status = statuses.get(key) ?? "active";
-                  const regex = safeRegex(p.pattern);
-                  const matchCount = regex
-                    ? (p["apply-to"] !== "exchanges" ? queues.filter((q) => q.vhost === p.vhost && regex.test(q.name)).length : 0)
-                      + (p["apply-to"] !== "queues" ? exchanges.filter((e) => e.vhost === p.vhost && regex.test(e.name)).length : 0)
-                    : 0;
-                  return (
-                    <tr
-                      key={key}
-                      onClick={() => setSelectedKey({ vhost: p.vhost, name: p.name })}
-                      className="cursor-pointer hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-5 py-3"><StatusBadge status={status} /></td>
-                      <td className="px-5 py-3 text-center font-mono font-semibold">{p.priority}</td>
-                      <td className="px-5 py-3 font-medium">{p.name}</td>
-                      <td className="px-5 py-3 font-mono text-muted-foreground text-xs">{p.vhost}</td>
-                      <td className="px-5 py-3 font-mono text-xs max-w-[160px] truncate" title={p.pattern}>{p.pattern}</td>
-                      <td className="px-5 py-3"><ApplyBadge applyTo={p["apply-to"]} /></td>
-                      <td className="px-5 py-3 text-muted-foreground text-xs max-w-[200px] truncate" title={JSON.stringify(p.definition)}>
-                        {defSummary(p.definition) || <span className="italic">empty</span>}
-                      </td>
-                      <td className="px-5 py-3 text-right font-mono">{matchCount}</td>
-                      <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setEditingPolicy(p)}
-                            className="px-2.5 py-1 text-xs border rounded hover:bg-muted transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (!confirm(`Delete policy "${p.name}"?`)) return;
-                              await fetch(`/api/rabbitmq/policies/${encodeURIComponent(p.vhost)}/${encodeURIComponent(p.name)}`, { method: "DELETE" });
-                              await queryClient.invalidateQueries({ queryKey: ["policies"] });
-                            }}
-                            className="px-2.5 py-1 text-xs border border-destructive/30 text-destructive rounded hover:bg-destructive/10 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-5 py-3 bg-muted/30 border-t flex justify-between items-center text-xs text-muted-foreground">
-          <span>
-            {filtered.length === 0 ? "0 policies" : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <Pagination page={page} total={filtered.length} onChange={setPage} />
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={pagedData}
+        isLoading={!policies}
+        onRowClick={(p) => setSelectedKey({ vhost: p.vhost, name: p.name })}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        page={page}
+        pageCount={pageCount}
+        totalCount={totalCount}
+        pageSize={20}
+        onPageChange={setPage}
+        emptyMessage="No policies configured"
+      />
 
       {/* detail drawer */}
       {selected && editingPolicy === false && (
