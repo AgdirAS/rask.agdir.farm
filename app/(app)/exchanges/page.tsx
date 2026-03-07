@@ -29,10 +29,9 @@ import {
   ArrowUpDown,
   X,
   AlertTriangle,
-  Activity,
 } from "lucide-react";
 import { useTraceStream } from "@/lib/use-trace-stream";
-import { TraceSidebar, type TraceSidebarEntity } from "@/components/trace-sidebar";
+import { TraceTab } from "@/components/trace-tab";
 
 // ── type badge ────────────────────────────────────────────────────────────────
 
@@ -200,12 +199,29 @@ interface DrawerProps {
   onDelete: (vhost: string, name: string) => Promise<void>;
 }
 
-type DrawerTab = "details" | "test";
+type DrawerTab = "details" | "test" | "trace";
 
 function ExchangeDrawer({ exchange, bindings, onClose, onDelete }: DrawerProps) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [drawerTab, setDrawerTab] = useState<DrawerTab>("details");
+  const trace = useTraceStream();
+  const traceEvents = trace.events.filter((e) => e.exchange === exchange?.name);
+
+  useEffect(() => {
+    if (drawerTab === "trace") {
+      void trace.start(exchange?.vhost ?? "/");
+    } else {
+      void trace.stop();
+      trace.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerTab, exchange?.vhost]);
+
+  useEffect(() => {
+    return () => { void trace.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!exchange) return null;
 
@@ -251,88 +267,94 @@ function ExchangeDrawer({ exchange, bindings, onClose, onDelete }: DrawerProps) 
 
         {/* drawer tabs */}
         <div className="flex border-b bg-muted/30 px-5">
-          {(["details", "test"] as DrawerTab[]).map((t) => (
+          {(["details", "test", "trace"] as DrawerTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setDrawerTab(t)}
               className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${drawerTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
-              {t === "details" ? "Details" : "Test Routing Key"}
+              {t === "details" ? "Details" : t === "test" ? "Test Routing Key" : trace.active ? "Live Trace ●" : "Live Trace"}
             </button>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
-          {drawerTab === "test" && (
-            <RoutingKeyTester exchange={exchange} bindings={bindings} />
-          )}
-          {drawerTab === "details" && (<>
-          {/* metadata grid */}
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Metadata</p>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "Type",        value: exchange.type },
-                { label: "Durable",     value: exchange.durable     ? "Yes" : "No" },
-                { label: "Auto-delete", value: exchange.auto_delete ? "Yes" : "No" },
-                { label: "Internal",    value: exchange.internal    ? "Yes" : "No" },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-md bg-muted/60 px-3 py-2.5">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
-                  <p className="mt-0.5 text-sm font-medium">{value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* message rates */}
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Message Rates</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-md bg-muted/60 px-3 py-2.5">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Publish in</p>
-                <p className="mt-0.5 text-sm font-medium tabular-nums">
-                  {fmtRate(exchange.message_stats?.publish_details?.rate)}
-                </p>
-              </div>
-              <div className="rounded-md bg-muted/60 px-3 py-2.5">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Deliver out</p>
-                <p className="mt-0.5 text-sm font-medium tabular-nums">
-                  {fmtRate(exchange.message_stats?.deliver_get_details?.rate)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* bindings */}
-          <div>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Bindings ({bindings.length})
-            </p>
-            {bindings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No bindings.</p>
-            ) : (
-              <div className="space-y-1">
-                {bindings.map((b, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                  >
-                    <span className="shrink-0 font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground max-w-[140px] truncate">
-                      {b.routing_key || "#"}
-                    </span>
-                    <span className="text-muted-foreground shrink-0">→</span>
-                    <span className="font-medium truncate">{b.destination}</span>
-                    {b.destination_type === "exchange" && (
-                      <span className="ml-auto shrink-0 text-[10px] text-muted-foreground italic">exchange</span>
-                    )}
+        {drawerTab !== "trace" ? (
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+            {drawerTab === "test" && (
+              <RoutingKeyTester exchange={exchange} bindings={bindings} />
+            )}
+            {drawerTab === "details" && (<>
+            {/* metadata grid */}
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Metadata</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Type",        value: exchange.type },
+                  { label: "Durable",     value: exchange.durable     ? "Yes" : "No" },
+                  { label: "Auto-delete", value: exchange.auto_delete ? "Yes" : "No" },
+                  { label: "Internal",    value: exchange.internal    ? "Yes" : "No" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-md bg-muted/60 px-3 py-2.5">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                    <p className="mt-0.5 text-sm font-medium">{value}</p>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+
+            {/* message rates */}
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Message Rates</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-md bg-muted/60 px-3 py-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Publish in</p>
+                  <p className="mt-0.5 text-sm font-medium tabular-nums">
+                    {fmtRate(exchange.message_stats?.publish_details?.rate)}
+                  </p>
+                </div>
+                <div className="rounded-md bg-muted/60 px-3 py-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Deliver out</p>
+                  <p className="mt-0.5 text-sm font-medium tabular-nums">
+                    {fmtRate(exchange.message_stats?.deliver_get_details?.rate)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* bindings */}
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Bindings ({bindings.length})
+              </p>
+              {bindings.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No bindings.</p>
+              ) : (
+                <div className="space-y-1">
+                  {bindings.map((b, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span className="shrink-0 font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground max-w-[140px] truncate">
+                        {b.routing_key || "#"}
+                      </span>
+                      <span className="text-muted-foreground shrink-0">→</span>
+                      <span className="font-medium truncate">{b.destination}</span>
+                      {b.destination_type === "exchange" && (
+                        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground italic">exchange</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            </>)}
           </div>
-          </>)}
-        </div>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <TraceTab trace={trace} events={traceEvents} />
+          </div>
+        )}
 
         {/* actions footer */}
         <div className="border-t px-5 py-4 space-y-3">
@@ -437,8 +459,6 @@ export default function ExchangesPage() {
   const [sortKey,     setSortKey]     = useState<SortKey>("name");
   const [sortDir,     setSortDir]     = useState<SortDir>("asc");
   const [selected,    setSelected]    = useState<Exchange | null>(null);
-  const [tracedEntity, setTracedEntity] = useState<TraceSidebarEntity | null>(null);
-  const trace = useTraceStream();
 
   async function handleDelete(vhost: string, name: string) {
     await fetch(
@@ -621,7 +641,6 @@ export default function ExchangesPage() {
                   Bindings
                 </SortButton>
               </TableHead>
-              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -629,7 +648,7 @@ export default function ExchangesPage() {
               <TableSkeleton />
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No exchanges found
                 </TableCell>
               </TableRow>
@@ -701,18 +720,6 @@ export default function ExchangesPage() {
                         )}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <button
-                        title="Live trace"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTracedEntity({ type: "exchange", name: exchange.name, vhost: exchange.vhost });
-                        }}
-                        className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <Activity className="h-3.5 w-3.5" />
-                      </button>
-                    </TableCell>
                   </TableRow>
                 );
               })
@@ -727,11 +734,6 @@ export default function ExchangesPage() {
         bindings={selectedBindings}
         onClose={() => setSelected(null)}
         onDelete={handleDelete}
-      />
-      <TraceSidebar
-        entity={tracedEntity}
-        trace={trace}
-        onClose={() => setTracedEntity(null)}
       />
     </div>
   );
