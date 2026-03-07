@@ -5,15 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn, fmtRate } from "@/lib/utils";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
@@ -24,14 +15,12 @@ import {
   Lock,
   Send,
   Trash2,
-  ChevronUp,
-  ChevronDown,
-  ArrowUpDown,
   X,
   AlertTriangle,
 } from "lucide-react";
 import { useTraceStream } from "@/lib/use-trace-stream";
 import { TraceTab } from "@/components/trace-tab";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── type badge ────────────────────────────────────────────────────────────────
 
@@ -62,25 +51,6 @@ function BoolIcon({ value, title }: { value: boolean; title: string }) {
 
 const isDefault = (name: string) => name === "";
 const isSystem  = (name: string) => name.startsWith("amq.");
-
-type SortKey = "name" | "vhost" | "type" | "bindings";
-type SortDir = "asc" | "desc";
-
-// ── skeleton rows ─────────────────────────────────────────────────────────────
-
-function TableSkeleton() {
-  return (
-    <>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: 7 }).map((_, j) => (
-            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-          ))}
-        </TableRow>
-      ))}
-    </>
-  );
-}
 
 // ── routing key tester ────────────────────────────────────────────────────────
 
@@ -422,37 +392,6 @@ function ExchangeDrawer({ exchange, bindings, onClose, onDelete }: DrawerProps) 
   );
 }
 
-// ── sort button ───────────────────────────────────────────────────────────────
-
-function SortButton({
-  children,
-  sortKey,
-  active,
-  dir,
-  onSort,
-}: {
-  children: React.ReactNode;
-  sortKey: SortKey;
-  active: SortKey;
-  dir: SortDir;
-  onSort: (k: SortKey) => void;
-}) {
-  const isActive = active === sortKey;
-  return (
-    <button
-      className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide hover:text-foreground transition-colors"
-      onClick={() => onSort(sortKey)}
-    >
-      {children}
-      {isActive ? (
-        dir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-      ) : (
-        <ArrowUpDown className="h-3 w-3 opacity-40" />
-      )}
-    </button>
-  );
-}
-
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default function ExchangesPage() {
@@ -461,8 +400,6 @@ export default function ExchangesPage() {
   const [search,      setSearch]      = useState("");
   const [vhostFilter, setVhostFilter] = useState("__all__");
   const [typeFilter,  setTypeFilter]  = useState("__all__");
-  const [sortKey,     setSortKey]     = useState<SortKey>("name");
-  const [sortDir,     setSortDir]     = useState<SortDir>("asc");
   const [selected,    setSelected]    = useState<Exchange | null>(null);
 
   async function handleDelete(vhost: string, name: string) {
@@ -540,11 +477,6 @@ export default function ExchangesPage() {
     return () => setActions(null);
   }, [search, vhostFilter, typeFilter, vhosts, types, setActions]);
 
-  function toggleSort(k: SortKey) {
-    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(k); setSortDir("asc"); }
-  }
-
   const filtered = useMemo(() => {
     const list = exchanges.filter((e) => {
       if (vhostFilter !== "__all__" && e.vhost !== vhostFilter) return false;
@@ -557,24 +489,116 @@ export default function ExchangesPage() {
       return true;
     });
 
-    list.sort((a, b) => {
-      let cmp = 0;
-      if      (sortKey === "name")     cmp = (a.name || "(default)").localeCompare(b.name || "(default)");
-      else if (sortKey === "vhost")    cmp = a.vhost.localeCompare(b.vhost);
-      else if (sortKey === "type")     cmp = a.type.localeCompare(b.type);
-      else if (sortKey === "bindings") {
-        const ac = bindingsCountMap.get(`${a.vhost}/${a.name}`) ?? 0;
-        const bc = bindingsCountMap.get(`${b.vhost}/${b.name}`) ?? 0;
-        cmp = ac - bc;
-      }
-      return sortDir === "desc" ? -cmp : cmp;
-    });
-
     // Default exchange always first
     const defaults = list.filter((e) => isDefault(e.name));
     const rest     = list.filter((e) => !isDefault(e.name));
     return [...defaults, ...rest];
-  }, [exchanges, search, vhostFilter, typeFilter, sortKey, sortDir, bindingsCountMap]);
+  }, [exchanges, search, vhostFilter, typeFilter]);
+
+  const { pagedData: sortedData, sortKey, sortDir, toggleSort } = useDataTable({
+    data: filtered,
+    pageSize: 0,
+    defaultSortKey: "name",
+    getSortValue: (ex, key) => {
+      if (key === "bindings") return bindingsCountMap.get(`${ex.vhost}/${ex.name}`) ?? 0;
+      return (ex as unknown as Record<string, unknown>)[key] as string ?? "";
+    },
+  });
+
+  const columns: DataTableColumn<Exchange>[] = useMemo(() => [
+    {
+      key: "vhost",
+      header: "Vhost",
+      sortable: true,
+      render: (exchange) => (
+        <span className="text-muted-foreground text-sm font-mono">{exchange.vhost}</span>
+      ),
+    },
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      render: (exchange) => {
+        const isDefault_ = isDefault(exchange.name);
+        const isSystem_  = isSystem(exchange.name);
+        return isDefault_ ? (
+          <span className="italic text-muted-foreground text-sm">(default)</span>
+        ) : (
+          <span className={cn("text-sm font-medium", isSystem_ && "text-muted-foreground")}>
+            {exchange.name}
+          </span>
+        );
+      },
+    },
+    {
+      key: "type",
+      header: "Type",
+      sortable: true,
+      render: (exchange) => <TypeBadge type={exchange.type} />,
+    },
+    {
+      key: "features",
+      header: "Features",
+      render: (exchange) => (
+        <div className="flex items-center gap-1.5">
+          <BoolIcon value={exchange.durable} title="Durable" />
+          {exchange.auto_delete && (
+            <span
+              className="text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded px-1 py-0.5"
+              title="Auto-delete"
+            >
+              AD
+            </span>
+          )}
+          {exchange.internal && (
+            <span title="Internal — not directly publishable">
+              <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "rate_in",
+      header: "Rate In",
+      align: "right",
+      render: (exchange) => (
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {fmtRate(exchange.message_stats?.publish_details?.rate)}
+        </span>
+      ),
+    },
+    {
+      key: "rate_out",
+      header: "Rate Out",
+      align: "right",
+      render: (exchange) => (
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {fmtRate(exchange.message_stats?.deliver_get_details?.rate)}
+        </span>
+      ),
+    },
+    {
+      key: "bindings",
+      header: "Bindings",
+      sortable: true,
+      render: (exchange) => {
+        const bindCount = bindingsCountMap.get(`${exchange.vhost}/${exchange.name}`) ?? 0;
+        const isDefault_ = isDefault(exchange.name);
+        const warnNoBindings = !isDefault_ && exchange.type !== "fanout" && bindCount === 0;
+        return (
+          <span className={cn("text-sm font-medium", warnNoBindings && "text-amber-600 dark:text-amber-400")}>
+            {bindCount}
+            {warnNoBindings && (
+              <span title="No bindings — likely misconfigured">
+                <AlertTriangle className="inline-block ml-1.5 h-3.5 w-3.5 align-text-bottom" />
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+  ], [bindingsCountMap]);
 
   const selectedBindings = useMemo(
     () => selected
@@ -619,119 +643,22 @@ export default function ExchangesPage() {
       </div>
 
       {/* table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <SortButton sortKey="vhost" active={sortKey} dir={sortDir} onSort={toggleSort}>
-                  Vhost
-                </SortButton>
-              </TableHead>
-              <TableHead>
-                <SortButton sortKey="name" active={sortKey} dir={sortDir} onSort={toggleSort}>
-                  Name
-                </SortButton>
-              </TableHead>
-              <TableHead>
-                <SortButton sortKey="type" active={sortKey} dir={sortDir} onSort={toggleSort}>
-                  Type
-                </SortButton>
-              </TableHead>
-              <TableHead>Features</TableHead>
-              <TableHead className="text-right">Rate In</TableHead>
-              <TableHead className="text-right">Rate Out</TableHead>
-              <TableHead>
-                <SortButton sortKey="bindings" active={sortKey} dir={sortDir} onSort={toggleSort}>
-                  Bindings
-                </SortButton>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableSkeleton />
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  No exchanges found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((exchange) => {
-                const bindCount   = bindingsCountMap.get(`${exchange.vhost}/${exchange.name}`) ?? 0;
-                const isDefault_  = isDefault(exchange.name);
-                const isSystem_   = isSystem(exchange.name);
-                const publishRate = exchange.message_stats?.publish_details?.rate;
-                const deliverRate = exchange.message_stats?.deliver_get_details?.rate;
-                // Non-default, non-fanout exchanges with 0 bindings are likely misconfigured
-                const warnNoBindings = !isDefault_ && exchange.type !== "fanout" && bindCount === 0;
-
-                return (
-                  <TableRow
-                    key={`${exchange.vhost}/${exchange.name}`}
-                    className={cn(
-                      "cursor-pointer",
-                      (isSystem_ || isDefault_) && "opacity-60",
-                    )}
-                    onClick={() => setSelected(exchange)}
-                  >
-                    <TableCell className="text-muted-foreground text-sm font-mono">
-                      {exchange.vhost}
-                    </TableCell>
-                    <TableCell>
-                      {isDefault_ ? (
-                        <span className="italic text-muted-foreground text-sm">(default)</span>
-                      ) : (
-                        <span className={cn("text-sm font-medium", isSystem_ && "text-muted-foreground")}>
-                          {exchange.name}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <TypeBadge type={exchange.type} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <BoolIcon value={exchange.durable} title="Durable" />
-                        {exchange.auto_delete && (
-                          <span
-                            className="text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded px-1 py-0.5"
-                            title="Auto-delete"
-                          >
-                            AD
-                          </span>
-                        )}
-                        {exchange.internal && (
-                          <span title="Internal — not directly publishable">
-                            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {fmtRate(publishRate)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {fmtRate(deliverRate)}
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn("text-sm font-medium", warnNoBindings && "text-amber-600 dark:text-amber-400")}>
-                        {bindCount}
-                        {warnNoBindings && (
-                          <span title="No bindings — likely misconfigured">
-                            <AlertTriangle className="inline-block ml-1.5 h-3.5 w-3.5 align-text-bottom" />
-                          </span>
-                        )}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={sortedData}
+        isLoading={isLoading}
+        onRowClick={(exchange) => setSelected(exchange)}
+        getRowClassName={(exchange) => {
+          const isDefault_ = isDefault(exchange.name);
+          const isSystem_ = isSystem(exchange.name);
+          return (isSystem_ || isDefault_) ? "opacity-60" : "";
+        }}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        pageSize={0}
+        emptyMessage="No exchanges found"
+      />
 
       {/* detail drawer */}
       <ExchangeDrawer
