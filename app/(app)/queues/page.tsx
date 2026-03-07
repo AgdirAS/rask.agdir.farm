@@ -12,6 +12,7 @@ import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
 import { useTraceStream } from "@/lib/use-trace-stream";
 import { TraceTab } from "@/components/trace-tab";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 function getArg<T>(args: Record<string, unknown>, key: string): T | undefined {
   return args[key] as T | undefined;
@@ -64,33 +65,7 @@ function DlxIcon({ exchange }: { exchange: string }) {
 
 // ── summary card ──────────────────────────────────────────────────────────────
 
-// ── pagination ────────────────────────────────────────────────────────────────
-
 const PAGE_SIZE = 20;
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
-  const visible: (number | "…")[] = [];
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) visible.push(i);
-    else if (visible[visible.length - 1] !== "…") visible.push("…");
-  }
-  return (
-    <div className="flex gap-1 text-sm">
-      <button onClick={() => onChange(page - 1)} disabled={page === 1}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
-      {visible.map((v, i) =>
-        v === "…"
-          ? <span key={`e${i}`} className="px-2.5 py-1.5 text-muted-foreground">…</span>
-          : <button key={v} onClick={() => onChange(v as number)}
-              className={`px-2.5 py-1.5 border rounded font-medium transition-colors ${v === page ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>{v}</button>
-      )}
-      <button onClick={() => onChange(page + 1)} disabled={page === Math.ceil(total / PAGE_SIZE)}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">›</button>
-    </div>
-  );
-}
 
 // ── DLQ chain tracing ─────────────────────────────────────────────────────────
 
@@ -907,7 +882,6 @@ export default function QueuesPage() {
   const [vhostFilter, setVhost]   = useState("all");
   const [typeFilter, setType]     = useState("all");
   const [stateFilter, setState]   = useState("all");
-  const [page, setPage]           = useState(1);
   const [selectedKey, setSelectedKey] = useState<{ vhost: string; name: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -941,7 +915,7 @@ export default function QueuesPage() {
             className="pl-9 w-52"
             placeholder="Search by name or vhost…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); }}
           />
         </div>
         {[
@@ -949,7 +923,7 @@ export default function QueuesPage() {
           { label: "Type",   value: typeFilter,  set: setType,   opts: ALL_TYPES as unknown as string[] },
           { label: "State",  value: stateFilter, set: setState,  opts: ALL_STATES as unknown as string[] },
         ].map(({ label, value, set, opts }) => (
-          <Select key={label} value={value} onValueChange={(v) => { set(v); setPage(1); }}>
+          <Select key={label} value={value} onValueChange={(v) => { set(v); }}>
             <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{label}: All</SelectItem>
@@ -979,7 +953,26 @@ export default function QueuesPage() {
     });
   }, [data, search, vhostFilter, typeFilter, stateFilter]);
 
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { pagedData, sortKey, sortDir, toggleSort, page, setPage, pageCount } = useDataTable<Queue>({
+    data: filtered,
+    pageSize: PAGE_SIZE,
+    defaultSortKey: "name",
+    getSortValue: (q, key) => {
+      const map: Record<string, unknown> = {
+        name: q.name,
+        vhost: q.vhost,
+        type: q.type ?? "classic",
+        state: q.state,
+        messages_ready: q.messages_ready ?? 0,
+        messages_unacknowledged: q.messages_unacknowledged ?? 0,
+        consumers: q.consumers ?? 0,
+        publish_rate: q.message_stats?.publish_details?.rate ?? 0,
+        deliver_rate: q.message_stats?.deliver_get_details?.rate ?? 0,
+        memory: q.memory ?? 0,
+      };
+      return (map[key] as string | number) ?? "";
+    },
+  });
 
   const totalMessages  = data?.reduce((s, q) => s + (q.messages ?? 0), 0) ?? 0;
   const totalUnacked   = data?.reduce((s, q) => s + (q.messages_unacknowledged ?? 0), 0) ?? 0;
@@ -993,6 +986,94 @@ export default function QueuesPage() {
     if (isWarning)  return "bg-amber-50/40 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20";
     return "hover:bg-muted/30";
   }
+
+  const columns: DataTableColumn<Queue>[] = [
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      render: (q) => {
+        const dlxArg = getArg<string>(q.arguments ?? {}, "x-dead-letter-exchange");
+        return (
+          <span>
+            <span className="font-medium">{q.name}</span>
+            {dlxArg && <DlxIcon exchange={dlxArg} />}
+          </span>
+        );
+      },
+    },
+    {
+      key: "vhost",
+      header: "Vhost",
+      sortable: true,
+      render: (q) => <span className="font-mono text-sm text-muted-foreground">{q.vhost}</span>,
+    },
+    {
+      key: "type",
+      header: "Type",
+      sortable: true,
+      render: (q) => <TypeBadge type={q.type ?? "classic"} />,
+    },
+    {
+      key: "state",
+      header: "State",
+      sortable: true,
+      render: (q) => <StateBadge state={q.state} />,
+    },
+    {
+      key: "messages_ready",
+      header: "Ready",
+      sortable: true,
+      align: "right",
+      render: (q) => <span className="font-mono">{fmtCount(q.messages_ready)}</span>,
+    },
+    {
+      key: "messages_unacknowledged",
+      header: "Unacked",
+      sortable: true,
+      align: "right",
+      render: (q) => (
+        <span className={`font-mono font-semibold ${q.messages_unacknowledged > 0 ? "text-amber-500" : ""}`}>
+          {fmtCount(q.messages_unacknowledged)}
+        </span>
+      ),
+    },
+    {
+      key: "consumers",
+      header: "Consumers",
+      sortable: true,
+      align: "right",
+      render: (q) => {
+        const noConsumerAlert = q.consumers === 0 && q.messages > 0;
+        return (
+          <span className={`font-mono font-semibold ${noConsumerAlert ? "text-rose-500" : ""}`}>
+            {q.consumers}
+          </span>
+        );
+      },
+    },
+    {
+      key: "publish_rate",
+      header: "In",
+      sortable: true,
+      align: "right",
+      render: (q) => <span className="font-mono text-muted-foreground">{fmtRate(q.message_stats?.publish_details?.rate)}</span>,
+    },
+    {
+      key: "deliver_rate",
+      header: "Deliver",
+      sortable: true,
+      align: "right",
+      render: (q) => <span className="font-mono text-muted-foreground">{fmtRate(q.message_stats?.deliver_get_details?.rate)}</span>,
+    },
+    {
+      key: "memory",
+      header: "Memory",
+      sortable: true,
+      align: "right",
+      render: (q) => <span className="font-mono text-muted-foreground">{fmtBytes(q.memory ?? 0)}</span>,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -1019,85 +1100,26 @@ export default function QueuesPage() {
       </div>
 
       {/* table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-5 py-3">Name</th>
-                <th className="px-5 py-3">Vhost</th>
-                <th className="px-5 py-3">Type</th>
-                <th className="px-5 py-3">State</th>
-                <th className="px-5 py-3 text-right">Ready</th>
-                <th className="px-5 py-3 text-right">Unacked</th>
-                <th className="px-5 py-3 text-right">Consumers</th>
-                <th className="px-5 py-3 text-right">In</th>
-                <th className="px-5 py-3 text-right">Deliver</th>
-                <th className="px-5 py-3 text-right">Memory</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {!data ? (
-                <tr><td colSpan={10} className="px-5 py-6 text-center text-muted-foreground">Loading…</td></tr>
-              ) : paged.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-5 py-10 text-center">
-                    <p className="text-muted-foreground font-medium">No queues found</p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      {search || vhostFilter !== "all" || typeFilter !== "all" || stateFilter !== "all"
-                        ? "Try adjusting your filters"
-                        : "No queues declared in this broker"}
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                paged.map((q) => {
-                  const dlxArg = getArg<string>(q.arguments ?? {}, "x-dead-letter-exchange");
-                  const noConsumerAlert = q.consumers === 0 && q.messages > 0;
-                  return (
-                    <tr
-                      key={`${q.vhost}/${q.name}`}
-                      onClick={() => setSelectedKey({ vhost: q.vhost, name: q.name })}
-                      className={`cursor-pointer transition-colors ${rowClass(q)}`}
-                    >
-                      <td className="px-5 py-3">
-                        <span className="font-medium">{q.name}</span>
-                        {dlxArg && <DlxIcon exchange={dlxArg} />}
-                      </td>
-                      <td className="px-5 py-3 font-mono text-sm text-muted-foreground">{q.vhost}</td>
-                      <td className="px-5 py-3"><TypeBadge type={q.type ?? "classic"} /></td>
-                      <td className="px-5 py-3"><StateBadge state={q.state} /></td>
-                      <td className="px-5 py-3 text-right font-mono">{fmtCount(q.messages_ready)}</td>
-                      <td className={`px-5 py-3 text-right font-mono font-semibold ${q.messages_unacknowledged > 0 ? "text-amber-500" : ""}`}>
-                        {fmtCount(q.messages_unacknowledged)}
-                      </td>
-                      <td className={`px-5 py-3 text-right font-mono font-semibold ${noConsumerAlert ? "text-rose-500" : ""}`}>
-                        {q.consumers}
-                      </td>
-                      <td className="px-5 py-3 text-right font-mono text-muted-foreground">
-                        {fmtRate(q.message_stats?.publish_details?.rate)}
-                      </td>
-                      <td className="px-5 py-3 text-right font-mono text-muted-foreground">
-                        {fmtRate(q.message_stats?.deliver_get_details?.rate)}
-                      </td>
-                      <td className="px-5 py-3 text-right font-mono text-muted-foreground">
-                        {fmtBytes(q.memory ?? 0)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-5 py-3 bg-muted/30 border-t flex justify-between items-center text-xs text-muted-foreground">
-          <span>
-            {filtered.length === 0 ? "0 queues" : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <Pagination page={page} total={filtered.length} onChange={setPage} />
-        </div>
-      </div>
+      <DataTable<Queue>
+        columns={columns}
+        data={pagedData}
+        isLoading={!data}
+        emptyMessage={
+          search || vhostFilter !== "all" || typeFilter !== "all" || stateFilter !== "all"
+            ? "Try adjusting your filters"
+            : "No queues declared in this broker"
+        }
+        onRowClick={(q) => setSelectedKey({ vhost: q.vhost, name: q.name })}
+        getRowClassName={rowClass}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        page={page}
+        pageCount={pageCount}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        pageSize={PAGE_SIZE}
+      />
 
       {selected && (
         <DetailDrawer
