@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── badges ────────────────────────────────────────────────────────────────────
 
@@ -166,8 +167,6 @@ function ConfirmDialog({
   );
 }
 
-// ── summary card ──────────────────────────────────────────────────────────────
-
 // ── section header ────────────────────────────────────────────────────────────
 
 function SectionHead({ icon, label }: { icon: React.ReactNode; label: string }) {
@@ -179,113 +178,123 @@ function SectionHead({ icon, label }: { icon: React.ReactNode; label: string }) 
   );
 }
 
-// ── table header shared ───────────────────────────────────────────────────────
+// ── column factory ────────────────────────────────────────────────────────────
 
-function TableHead() {
-  return (
-    <thead className="bg-muted/50 text-muted-foreground text-[10px] uppercase font-bold tracking-wide border-b border-border">
-      <tr>
-        <th className="px-5 py-3">Name</th>
-        <th className="px-5 py-3">Description</th>
-        <th className="px-5 py-3">Stability</th>
-        <th className="px-5 py-3">Provided By</th>
-        <th className="px-5 py-3 text-center">Deps</th>
-        <th className="px-5 py-3 text-right">State / Action</th>
-      </tr>
-    </thead>
-  );
-}
-
-// ── flag row ──────────────────────────────────────────────────────────────────
-
-function FlagRow({
-  flag,
-  enabledNames,
-  onEnableClick,
-}: {
-  flag: FeatureFlag;
-  enabledNames: Set<string>;
-  onEnableClick: (flag: FeatureFlag) => void;
-}) {
-  const isExperimental = flag.stability === "experimental";
-  const unmetDeps = (flag.depends_on ?? []).filter((d) => !enabledNames.has(d));
-  const canEnable = flag.state === "disabled" && unmetDeps.length === 0;
-  const isUnavailable = flag.state === "unavailable";
-
-  return (
-    <tr
-      className={`transition-colors ${
-        isUnavailable
-          ? "bg-muted/20"
-          : isExperimental && flag.state === "disabled"
-          ? "bg-indigo-50/30 dark:bg-indigo-950/20 border-l-2 border-indigo-500"
-          : "hover:bg-muted/30"
-      }`}
-    >
-      <td className="px-5 py-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className={`font-mono text-xs font-semibold ${
-              isUnavailable
-                ? "text-muted-foreground/50"
-                : isExperimental && flag.state === "disabled"
-                ? "text-indigo-700 dark:text-indigo-400"
-                : "text-foreground"
-            }`}
-          >
-            {flag.name}
-          </span>
-          {isExperimental && flag.state === "disabled" && (
-            <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-[9px] rounded font-bold uppercase tracking-widest border border-indigo-200 dark:border-indigo-800">
-              Experimental
+function makeFlagColumns(
+  enabledNames: Set<string>,
+  onEnableClick: (flag: FeatureFlag) => void,
+): DataTableColumn<FeatureFlag>[] {
+  return [
+    {
+      key: "name",
+      header: "Name",
+      render: (flag) => {
+        const isUnavailable = flag.state === "unavailable";
+        const isExperimental = flag.stability === "experimental";
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={`font-mono text-xs font-semibold ${
+                isUnavailable
+                  ? "text-muted-foreground/50"
+                  : isExperimental && flag.state === "disabled"
+                  ? "text-indigo-700 dark:text-indigo-400"
+                  : "text-foreground"
+              }`}
+            >
+              {flag.name}
             </span>
-          )}
-        </div>
-      </td>
-      <td
-        className={`px-5 py-3 text-sm max-w-xs truncate ${
-          isUnavailable ? "text-muted-foreground/40" : "text-muted-foreground"
-        } ${isExperimental && flag.state === "disabled" ? "italic" : ""}`}
-        title={flag.desc}
-      >
-        {flag.desc}
-      </td>
-      <td className="px-5 py-3">
-        {isUnavailable ? (
+            {isExperimental && flag.state === "disabled" && (
+              <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 text-[9px] rounded font-bold uppercase tracking-widest border border-indigo-200 dark:border-indigo-800">
+                Experimental
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "desc",
+      header: "Description",
+      render: (flag) => {
+        const isUnavailable = flag.state === "unavailable";
+        const isExperimental = flag.stability === "experimental";
+        return (
+          <span
+            className={`text-sm max-w-xs truncate block ${
+              isUnavailable ? "text-muted-foreground/40" : "text-muted-foreground"
+            } ${isExperimental && flag.state === "disabled" ? "italic" : ""}`}
+            title={flag.desc}
+          >
+            {flag.desc}
+          </span>
+        );
+      },
+    },
+    {
+      key: "stability",
+      header: "Stability",
+      render: (flag) => {
+        const isUnavailable = flag.state === "unavailable";
+        return isUnavailable ? (
           <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-muted text-muted-foreground/50 border border-border">
             {flag.stability}
           </span>
         ) : (
           <StabilityBadge stability={flag.stability} />
-        )}
-      </td>
-      <td className={`px-5 py-3 text-sm ${isUnavailable ? "text-muted-foreground/40" : "text-muted-foreground"}`}>
-        {flag.provided_by}
-      </td>
-      <td className="px-5 py-3 text-center">
-        <DepsCell deps={flag.depends_on} enabledNames={enabledNames} />
-      </td>
-      <td className="px-5 py-3 text-right">
-        {flag.state === "enabled" && <StateBadge state="enabled" />}
-        {flag.state === "unavailable" && (
-          <div className="inline-flex items-center gap-1.5">
-            <StateBadge state="unavailable" />
-            <span
-              title="Not all cluster nodes support this flag"
-              className="text-muted-foreground cursor-help"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M8 7.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                <circle cx="8" cy="5.5" r="0.75" fill="currentColor" />
-              </svg>
-            </span>
-          </div>
-        )}
-        {flag.state === "disabled" && (
-          canEnable ? (
+        );
+      },
+    },
+    {
+      key: "provided_by",
+      header: "Provided By",
+      render: (flag) => {
+        const isUnavailable = flag.state === "unavailable";
+        return (
+          <span className={`text-sm ${isUnavailable ? "text-muted-foreground/40" : "text-muted-foreground"}`}>
+            {flag.provided_by}
+          </span>
+        );
+      },
+    },
+    {
+      key: "depends_on",
+      header: "Deps",
+      align: "center",
+      render: (flag) => <DepsCell deps={flag.depends_on} enabledNames={enabledNames} />,
+    },
+    {
+      key: "state",
+      header: "State / Action",
+      align: "right",
+      render: (flag) => {
+        const isExperimental = flag.stability === "experimental";
+        const unmetDeps = (flag.depends_on ?? []).filter((d) => !enabledNames.has(d));
+        const canEnable = flag.state === "disabled" && unmetDeps.length === 0;
+
+        if (flag.state === "enabled") return <StateBadge state="enabled" />;
+        if (flag.state === "unavailable") {
+          return (
+            <div className="inline-flex items-center gap-1.5">
+              <StateBadge state="unavailable" />
+              <span
+                title="Not all cluster nodes support this flag"
+                className="text-muted-foreground cursor-help"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M8 7.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  <circle cx="8" cy="5.5" r="0.75" fill="currentColor" />
+                </svg>
+              </span>
+            </div>
+          );
+        }
+        // disabled
+        if (canEnable) {
+          return (
             <button
-              onClick={() => onEnableClick(flag)}
+              onClick={(e) => { e.stopPropagation(); onEnableClick(flag); }}
               className={`px-3 py-1 text-xs font-semibold rounded hover:opacity-90 transition-opacity shadow-sm ${
                 isExperimental
                   ? "bg-indigo-600 text-white hover:bg-indigo-700"
@@ -294,20 +303,21 @@ function FlagRow({
             >
               Enable
             </button>
-          ) : (
-            <span title={`Requires: ${unmetDeps.join(", ")}`} className="inline-block">
-              <button
-                disabled
-                className="px-3 py-1 text-xs font-semibold rounded bg-muted text-muted-foreground/50 cursor-not-allowed"
-              >
-                Enable
-              </button>
-            </span>
-          )
-        )}
-      </td>
-    </tr>
-  );
+          );
+        }
+        return (
+          <span title={`Requires: ${unmetDeps.join(", ")}`} className="inline-block">
+            <button
+              disabled
+              className="px-3 py-1 text-xs font-semibold rounded bg-muted text-muted-foreground/50 cursor-not-allowed"
+            >
+              Enable
+            </button>
+          </span>
+        );
+      },
+    },
+  ];
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -401,11 +411,16 @@ export default function FeatureFlagsPage() {
   const experimentalCount = flags.filter((f) => f.stability === "experimental" && f.state === "enabled").length;
 
   // grouped
-  const enabled     = filtered.filter((f) => f.state === "enabled");
-  const disabled    = filtered.filter((f) => f.state === "disabled");
-  const unavailable = filtered.filter((f) => f.state === "unavailable");
+  const enabledFlags     = filtered.filter((f) => f.state === "enabled");
+  const disabledFlags    = filtered.filter((f) => f.state === "disabled");
+  const unavailableFlags = filtered.filter((f) => f.state === "unavailable");
 
   const hasDisabledFlags = disabledCount > 0;
+
+  const flagColumns = useMemo(
+    () => makeFlagColumns(enabledNames, setPendingFlag),
+    [enabledNames],
+  );
 
   async function handleConfirm() {
     if (!pendingFlag) return;
@@ -486,7 +501,7 @@ export default function FeatureFlagsPage() {
       {!isLoading && (
         <div className="space-y-8">
           {/* enabled */}
-          {enabled.length > 0 && (
+          {enabledFlags.length > 0 && (
             <section>
               <SectionHead
                 icon={
@@ -496,23 +511,17 @@ export default function FeatureFlagsPage() {
                 }
                 label="Enabled Feature Flags"
               />
-              <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <TableHead />
-                    <tbody className="divide-y divide-border">
-                      {enabled.map((f) => (
-                        <FlagRow key={f.name} flag={f} enabledNames={enabledNames} onEnableClick={setPendingFlag} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <DataTable
+                columns={flagColumns}
+                data={enabledFlags}
+                pageSize={0}
+                emptyMessage="No enabled flags"
+              />
             </section>
           )}
 
           {/* disabled */}
-          {disabled.length > 0 && (
+          {disabledFlags.length > 0 && (
             <section>
               <SectionHead
                 icon={
@@ -522,19 +531,18 @@ export default function FeatureFlagsPage() {
                 }
                 label="Disabled Feature Flags"
               />
-              <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <TableHead />
-                    <tbody className="divide-y divide-border">
-                      {disabled.map((f) => (
-                        <FlagRow key={f.name} flag={f} enabledNames={enabledNames} onEnableClick={setPendingFlag} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              {disabled.some((f) => f.stability === "experimental") && (
+              <DataTable
+                columns={flagColumns}
+                data={disabledFlags}
+                pageSize={0}
+                emptyMessage="No disabled flags"
+                getRowClassName={(flag) =>
+                  flag.stability === "experimental"
+                    ? "bg-indigo-50/30 dark:bg-indigo-950/20 border-l-2 border-indigo-500"
+                    : ""
+                }
+              />
+              {disabledFlags.some((f) => f.stability === "experimental") && (
                 <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 rounded-lg flex gap-3 items-center">
                   <svg className="w-4 h-4 text-orange-500 shrink-0" viewBox="0 0 16 16" fill="currentColor">
                     <path fillRule="evenodd" d="M6.788 1.996c.533-.924 1.891-.924 2.424 0l5.025 8.7c.532.923-.135 2.079-1.212 2.079H2.975c-1.077 0-1.744-1.156-1.212-2.079l5.025-8.7z" clipRule="evenodd" />
@@ -548,7 +556,7 @@ export default function FeatureFlagsPage() {
           )}
 
           {/* unavailable */}
-          {unavailable.length > 0 && (
+          {unavailableFlags.length > 0 && (
             <section>
               <SectionHead
                 icon={
@@ -558,17 +566,14 @@ export default function FeatureFlagsPage() {
                 }
                 label="Unavailable Feature Flags"
               />
-              <div className="bg-card border rounded-lg shadow-sm overflow-hidden opacity-75">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <TableHead />
-                    <tbody className="divide-y divide-border">
-                      {unavailable.map((f) => (
-                        <FlagRow key={f.name} flag={f} enabledNames={enabledNames} onEnableClick={setPendingFlag} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="opacity-75">
+                <DataTable
+                  columns={flagColumns}
+                  data={unavailableFlags}
+                  pageSize={0}
+                  emptyMessage="No unavailable flags"
+                  getRowClassName={() => "bg-muted/20"}
+                />
               </div>
             </section>
           )}
