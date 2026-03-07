@@ -36,7 +36,7 @@ export function TraceTab({ trace, events }: Props) {
         ) : (
           events.map((e, i) => (
             <div
-              key={i}
+              key={`${e.timestamp}-${e.routingKey ?? ""}-${i}`}
               className={`px-3 py-2 border-b hover:bg-muted/30 ${
                 e.type === "publish"
                   ? "border-l-2 border-l-violet-400"
@@ -62,7 +62,7 @@ export function TraceTab({ trace, events }: Props) {
                 {e.exchange || "(default)"}{e.queue ? ` → ${e.queue}` : ""}
               </div>
               <div className="text-muted-foreground truncate mt-0.5">
-                {e.payload.slice(0, 120)}{e.payload.length > 120 ? "…" : ""}
+                {(e.payload ?? "").slice(0, 120)}{(e.payload?.length ?? 0) > 120 ? "…" : ""}
               </div>
             </div>
           ))
