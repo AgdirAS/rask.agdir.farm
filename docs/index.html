@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rask — Modern RabbitMQ Dashboard</title>
+  <meta name="description" content="An open source RabbitMQ management UI by Agdir Drift AS. Because the native one is a bit long in the tooth." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Fira+Code:wght@400;500&family=Mona+Sans:ital,wdth,wght@0,75..125,200..900;1,75..125,200..900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0c0c10;
+      --bg-card:  #111118;
+      --bg-code:  #0a0a0e;
+      --border:   #1e1e2a;
+      --muted:    #3a3a50;
+      --text:     #dcd8cc;
+      --text-dim: #7a7890;
+      --gold:     #c9943a;
+      --gold-dim: #8a6020;
+      --green:    #4a9e72;
+      --red:      #c94a4a;
+      --radius:   6px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Mona Sans', sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+      font-variation-settings: 'wdth' 90;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(12, 12, 16, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.9rem;
+      color: var(--gold);
+      text-decoration: none;
+      letter-spacing: 0.05em;
+    }
+    .nav-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 7rem 0 5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -120px;
+      right: -80px;
+      width: 480px;
+      height: 480px;
+      background: radial-gradient(circle, rgba(201,148,58,0.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--gold);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .hero-eyebrow::before {
+      content: '';
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--gold);
+    }
+    h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(3rem, 8vw, 4.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: #f0ece0;
+      margin-bottom: 1.5rem;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--gold);
+    }
+    .hero-sub {
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      max-width: 520px;
+      line-height: 1.8;
+      margin-bottom: 2.5rem;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--gold);
+      color: #0c0c10;
+    }
+    .btn-primary:hover { background: #d9a84a; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 4rem 0;
+    }
+
+    /* ── Section headings ── */
+    h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.8rem;
+      color: #f0ece0;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.01em;
+    }
+    .section-label {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.7rem;
+      color: var(--gold-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+      display: block;
+    }
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #e8e4d8;
+      margin-bottom: 0.25rem;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Problem section ── */
+    .problem-text {
+      font-size: 1.05rem;
+      color: var(--text-dim);
+      line-height: 1.9;
+    }
+    .problem-text strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ── Features grid ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 2rem;
+    }
+    .feature-item {
+      background: var(--bg-card);
+      padding: 1.4rem 1.5rem;
+      transition: background 0.15s;
+    }
+    .feature-item:hover { background: #14141c; }
+    .feature-icon {
+      font-size: 1.1rem;
+      margin-bottom: 0.6rem;
+      display: block;
+    }
+    .feature-item p {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-family: 'Fira Code', monospace;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+    }
+    .badge-done {
+      background: rgba(74, 158, 114, 0.12);
+      color: var(--green);
+      border: 1px solid rgba(74, 158, 114, 0.25);
+    }
+    .badge-soon {
+      background: rgba(201, 148, 58, 0.1);
+      color: var(--gold);
+      border: 1px solid rgba(201, 148, 58, 0.2);
+    }
+    .badge-planned {
+      background: rgba(90, 90, 120, 0.15);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Quickstart ── */
+    .steps { margin-top: 2rem; }
+    .step {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 0 1.25rem;
+      margin-bottom: 2rem;
+      align-items: start;
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: var(--gold);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-body h3 { margin-bottom: 0.6rem; }
+    .step-body p {
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: #b8c0cc;
+    }
+    code {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.82rem;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      padding: 0.1em 0.4em;
+      border-radius: 3px;
+      color: #b8c0cc;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .token-comment { color: var(--muted); }
+    .token-key     { color: var(--gold); }
+    .token-val     { color: #7ab8a8; }
+    .token-cmd     { color: #a0c4ff; }
+
+    /* ── Env table ── */
+    .env-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.875rem;
+    }
+    .env-table th {
+      text-align: left;
+      padding: 0.5rem 1rem;
+      font-size: 0.7rem;
+      font-family: 'Fira Code', monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+    .env-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .env-table tr:last-child td { border-bottom: none; }
+    .env-table td:first-child { font-family: 'Fira Code', monospace; font-size: 0.8rem; color: var(--gold); }
+    .env-table td:nth-child(2) { color: var(--text-dim); font-family: 'Fira Code', monospace; font-size: 0.8rem; }
+    .env-table td:last-child { color: var(--text-dim); }
+
+    /* ── Roadmap ── */
+    .roadmap-list {
+      list-style: none;
+      margin-top: 1.75rem;
+    }
+    .roadmap-list li {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .roadmap-list li:last-child { border-bottom: none; }
+    .roadmap-list .item-text { flex: 1; color: var(--text-dim); }
+    .roadmap-list .item-text strong { color: var(--text); font-weight: 600; }
+
+    /* ── License box ── */
+    .license-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--gold-dim);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-top: 2rem;
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      line-height: 1.8;
+    }
+    .license-box strong { color: var(--text); }
+
+    /* ── Contribute ── */
+    .contribute-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .contribute-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+      display: block;
+    }
+    .contribute-card:hover {
+      border-color: var(--muted);
+      background: #14141c;
+    }
+    .contribute-card-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+    .contribute-card h3 { margin-bottom: 0.3rem; }
+    .contribute-card p {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+    .contribute-card .link-hint {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.72rem;
+      color: var(--gold-dim);
+      margin-top: 0.75rem;
+      display: block;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0 3rem;
+      margin-top: 5rem;
+    }
+    .footer-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .footer-left {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+    .footer-left a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; }
+    .footer-left a:hover { color: var(--text); }
+    .footer-squirrel {
+      font-size: 1.5rem;
+      opacity: 0.4;
+    }
+
+    /* ── Section spacing ── */
+    section { padding: 1rem 0; }
+
+    @media (max-width: 600px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .contribute-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      h1 { font-size: 2.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">rask/</a>
+    <ul class="nav-links">
+      <li><a href="#quickstart">Quick start</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+      <li><a href="#contribute">Contribute</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="https://github.com/agdir/rask" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- ── Hero ── -->
+  <header class="hero">
+    <div class="hero-eyebrow">open source · by agdir drift as</div>
+    <h1>A RabbitMQ UI<br />that doesn't feel like <em>2009.</em></h1>
+    <p class="hero-sub">
+      Rask is a modern management dashboard for RabbitMQ. Named after Ratatoskr,
+      the Norse messenger squirrel, it replaces the built-in UI with something
+      you'll actually want to use.
+    </p>
+    <div class="hero-actions">
+      <a href="#quickstart" class="btn btn-primary">Get started</a>
+      <a href="https://github.com/agdir/rask" target="_blank" rel="noopener" class="btn btn-ghost">View on GitHub ↗</a>
+    </div>
+  </header>
+
+  <hr class="divider" />
+
+  <!-- ── Problem ── -->
+  <section id="why">
+    <span class="section-label">Why Rask</span>
+    <h2>The native UI exposes the broker. It doesn't support the developer.</h2>
+    <p class="problem-text" style="margin-top:1rem;">
+      RabbitMQ's built-in management UI was designed to expose broker internals —
+      not to support developers actually working with it day-to-day.
+      <strong>Every feature in Rask exists because developers currently work around the UI.</strong>
+      Copying queue names manually. Opening browser devtools to inspect payloads.
+      Keeping a Notepad file of test messages. Refreshing the page to spot trends.
+    </p>
+    <p class="problem-text" style="margin-top:1rem;">
+      Rask closes that gap by treating <strong>the developer workflow as a first-class concern</strong>:
+      less clicking, less context switching, less "I wish this just showed me X."
+      These are not exotic features — they are table stakes for any modern developer tool,
+      and the fact that RabbitMQ's UI doesn't have them after 15 years is exactly the gap Rask is built to fill.
+    </p>
+    <p class="problem-text" style="margin-top:1rem;">
+      At <a href="https://agdir.no" style="color:var(--gold);text-decoration:underline;text-underline-offset:3px;">Agdir Drift AS</a>
+      we run RabbitMQ as part of our farming-as-a-service infrastructure and hit these walls daily.
+      Rask is what we wanted to exist.
+    </p>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Features ── -->
+  <section id="features">
+    <span class="section-label">Features</span>
+    <h2>What's in the box</h2>
+    <div class="features-grid">
+      <div class="feature-item">
+        <span class="feature-icon">⚡</span>
+        <h3>Queue management</h3>
+        <p>Sortable, filterable table with live 10-second polling. Critical queue highlighting. Detail drawer with peek, publish, purge, delete, and consumer inspection — all without leaving the page.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🔀</span>
+        <h3>Exchanges & bindings</h3>
+        <p>Full exchange list with type, durability, and auto-delete at a glance. Delete exchanges directly from the UI. Binding overview included.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🌐</span>
+        <h3>Connections & channels</h3>
+        <p>Live view of active connections with per-connection channel breakdown. Close connections from the UI. Dedicated channels page across all connections.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🏗️</span>
+        <h3>Vhosts & users</h3>
+        <p>Create, delete, and configure virtual hosts. Manage per-vhost tracing and permissions. Full user management with tag-based roles.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🚩</span>
+        <h3>Feature flags & limits</h3>
+        <p>View and toggle RabbitMQ feature flags. Configure per-vhost resource limits to cap max connections, channels, or queues.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🌍</span>
+        <h3>Multi-environment switcher</h3>
+        <p>Switch between RabbitMQ instances instantly. Environments are stored as named profiles and activated via a full-screen gateway overlay — no restarts needed.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">📊</span>
+        <h3>Overview dashboard</h3>
+        <p>Cluster-level stats, node health indicators, message rates, and connection counts at a glance. Auto-refreshes every 10 seconds.</p>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🌙</span>
+        <h3>Light · dark · system</h3>
+        <p>Full theme support that follows your OS preference by default, with a manual override in the header. No eye strain on either side.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Quick start ── -->
+  <section id="quickstart">
+    <span class="section-label">Quick start</span>
+    <h2>Up in three steps</h2>
+    <div class="steps">
+
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-body">
+          <h3>Clone and install</h3>
+          <p>Requires Node.js 20+ and pnpm.</p>
+          <pre><code><span class="token-cmd">git clone</span> https://github.com/agdir/rask
+<span class="token-cmd">cd</span> rask
+<span class="token-cmd">pnpm install</span></code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-body">
+          <h3>Configure your connection</h3>
+          <p>Copy the example file and fill in your RabbitMQ details. All values are optional — the defaults work with a local instance using guest/guest.</p>
+          <pre><code><span class="token-cmd">cp</span> .env.local.example .env.local</code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-body">
+          <h3>Run the dev server</h3>
+          <p>Open <code>http://localhost:35672</code>. Port 35672 is chosen to mirror RabbitMQ's own management port (15672) without conflicting with it.</p>
+          <pre><code><span class="token-cmd">pnpm dev</span></code></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">or</div>
+        <div class="step-body">
+          <h3>Run with Docker</h3>
+          <p>A pre-built image is published to GHCR on every release. Point it at your RabbitMQ host and go.</p>
+          <pre><code><span class="token-cmd">docker run</span> -p 35672:35672 \
+  -e RABBITMQ_HOST=<span class="token-val">your-host</span> \
+  -e RABBITMQ_USER=<span class="token-val">guest</span> \
+  -e RABBITMQ_PASSWORD=<span class="token-val">guest</span> \
+  ghcr.io/agdir/rask:latest</code></pre>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Config ── -->
+  <section id="configuration" style="padding-top:0; margin-top:-0.5rem;">
+    <span class="section-label">Configuration</span>
+    <h2>Environment variables</h2>
+    <p style="color:var(--text-dim);font-size:0.9rem;margin-top:0.5rem;">
+      All variables go in <code>.env.local</code>. You can also set them via the
+      <strong>Settings</strong> page in the UI — useful if you're running a built deployment.
+    </p>
+    <table class="env-table">
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Default</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>RABBITMQ_HOST</td><td>localhost</td><td>Hostname or IP of the RabbitMQ server</td></tr>
+        <tr><td>RABBITMQ_MANAGEMENT_PORT</td><td>15672</td><td>Management HTTP API port</td></tr>
+        <tr><td>RABBITMQ_AMQP_PORT</td><td>5672</td><td>AMQP protocol port</td></tr>
+        <tr><td>RABBITMQ_USER</td><td>guest</td><td>RabbitMQ username</td></tr>
+        <tr><td>RABBITMQ_PASSWORD</td><td>guest</td><td>RabbitMQ password</td></tr>
+        <tr><td>RABBITMQ_VHOST</td><td>/</td><td>Default virtual host</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Architecture note ── -->
+  <section id="architecture">
+    <span class="section-label">Architecture</span>
+    <h2>How it works</h2>
+    <p style="color:var(--text-dim);margin-top:0.75rem;margin-bottom:1.25rem;font-size:0.925rem;">
+      Rask runs as a Next.js server. The browser never talks to RabbitMQ directly —
+      all requests are proxied through Next.js API routes. AMQP operations
+      (peek, publish, purge) run server-side only via <code>amqplib</code>.
+    </p>
+    <pre><code><span class="token-comment"># Request flow</span>
+Browser  →  Next.js API routes  →  RabbitMQ Management HTTP API  (port 15672)
+                               →  RabbitMQ AMQP                  (port 5672, server-only)</code></pre>
+    <p style="color:var(--text-dim);margin-top:1.25rem;font-size:0.875rem;">
+      This means you can deploy Rask behind your existing auth proxy or VPN without
+      exposing the RabbitMQ management port publicly. Rask only needs to reach RabbitMQ
+      from the server side.
+    </p>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Roadmap ── -->
+  <section id="roadmap">
+    <span class="section-label">Roadmap</span>
+    <h2>What's coming</h2>
+    <p style="color:var(--text-dim);margin-top:0.5rem;font-size:0.9rem;">
+      These are the things we're actively thinking about or building next.
+      Priorities shift — <a href="https://github.com/agdir/rask/issues" style="color:var(--gold);text-decoration:underline;text-underline-offset:3px;">open an issue</a> if something matters to you.
+    </p>
+    <ul class="roadmap-list">
+      <li>
+        <span class="badge badge-soon">soon</span>
+        <span class="item-text"><strong>Azure AD SSO</strong> — Single sign-on via Microsoft Entra ID. First auth provider since it's what we use internally at Agdir.</span>
+      </li>
+      <li>
+        <span class="badge badge-planned">planned</span>
+        <span class="item-text"><strong>Bindings management</strong> — Create and delete bindings between exchanges and queues from the UI.</span>
+      </li>
+      <li>
+        <span class="badge badge-planned">planned</span>
+        <span class="item-text"><strong>Standalone publish page</strong> — Publish messages to any exchange with routing key and headers, independent of queue context.</span>
+      </li>
+      <li>
+        <span class="badge badge-planned">planned</span>
+        <span class="item-text"><strong>Additional SSO providers</strong> — Google Workspace, GitHub, and generic OIDC are on the list after Azure.</span>
+      </li>
+    </ul>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── License ── -->
+  <section id="license">
+    <span class="section-label">License</span>
+    <h2>Usage terms</h2>
+    <div class="license-box">
+      Rask is released under the <strong>Business Source License (BSL)</strong>.
+      It is <strong>free to use, self-host, and modify</strong> for personal, internal,
+      and non-commercial purposes. You may not offer Rask as a hosted service or include it
+      in a commercial product without a separate agreement.<br /><br />
+      All rights reserved to their respective owners.
+      © Agdir Drift AS — <a href="https://agdir.no" style="color:var(--gold-dim);">agdir.no</a>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── Contribute ── -->
+  <section id="contribute">
+    <span class="section-label">Contribute</span>
+    <h2>Get involved</h2>
+    <p style="color:var(--text-dim);margin-top:0.5rem;font-size:0.9rem;">
+      Rask is open source and we're happy to review contributions. The best way to start
+      a conversation is a GitHub issue — whether it's a bug, a feature idea, or a question
+      about the architecture.
+    </p>
+    <div class="contribute-grid">
+      <a href="https://github.com/agdir/rask/issues/new?labels=bug" target="_blank" rel="noopener" class="contribute-card">
+        <span class="contribute-card-icon">🐛</span>
+        <h3>Report a bug</h3>
+        <p>Something broken or behaving unexpectedly? Open a bug report and include steps to reproduce.</p>
+        <span class="link-hint">github.com/agdir/rask/issues →</span>
+      </a>
+      <a href="https://github.com/agdir/rask/issues/new?labels=feature" target="_blank" rel="noopener" class="contribute-card">
+        <span class="contribute-card-icon">💡</span>
+        <h3>Request a feature</h3>
+        <p>Have a workflow that Rask doesn't support yet? Describe the problem you're trying to solve.</p>
+        <span class="link-hint">github.com/agdir/rask/issues →</span>
+      </a>
+      <a href="https://github.com/agdir/rask/pulls" target="_blank" rel="noopener" class="contribute-card">
+        <span class="contribute-card-icon">🔧</span>
+        <h3>Submit a pull request</h3>
+        <p>For bigger changes, open an issue first so we can align on approach before you invest the time.</p>
+        <span class="link-hint">github.com/agdir/rask/pulls →</span>
+      </a>
+      <a href="https://github.com/agdir/rask/issues/new?labels=question" target="_blank" rel="noopener" class="contribute-card">
+        <span class="contribute-card-icon">💬</span>
+        <h3>Ask a question</h3>
+        <p>Not sure how something works, or curious about the architecture? Issues work fine for questions too.</p>
+        <span class="link-hint">github.com/agdir/rask/issues →</span>
+      </a>
+    </div>
+  </section>
+
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      Built by <a href="https://agdir.no" target="_blank" rel="noopener">Agdir Drift AS</a> — farming as a service.<br />
+      Named after Ratatoskr, the Norse messenger squirrel.
+    </div>
+    <div class="footer-squirrel" title="🐿️ Ratatoskr">🐿️</div>
+  </div>
+</footer>
+
+</body>
+</html>

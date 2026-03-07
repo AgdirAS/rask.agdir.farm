@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Rask</title>
+  <meta name="description" content="Rask stores nothing about you or your usage. No telemetry, no tracking, no data leaves your server." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Mona+Sans:ital,wdth,wght@0,75..125,200..900;1,75..125,200..900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0c0c10; --bg-card: #111118; --border: #1e1e2a;
+      --text: #dcd8cc; --text-dim: #7a7890; --gold: #c9943a; --gold-dim: #8a6020;
+      --green: #4a9e72; --radius: 6px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Mona Sans', sans-serif;
+      font-size: 16px; line-height: 1.7; font-variation-settings: 'wdth' 90;
+      -webkit-font-smoothing: antialiased; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 2rem; }
+    nav { position: sticky; top: 0; z-index: 100; background: rgba(12,12,16,0.85);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    .nav-inner { max-width: 720px; margin: 0 auto; padding: 0 2rem; height: 52px;
+      display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-family: 'Fira Code', monospace; font-size: 0.9rem; color: var(--gold);
+      text-decoration: none; letter-spacing: 0.05em; }
+    .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+    .nav-links a { color: var(--text-dim); text-decoration: none; font-size: 0.8rem;
+      font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; transition: color 0.15s; }
+    .nav-links a:hover { color: var(--text); }
+    main { padding: 4rem 0 6rem; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text); }
+    .page-intro { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 3rem; }
+    section { margin-bottom: 2.5rem; }
+    p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 0.75rem; }
+    p:last-child { margin-bottom: 0; }
+    strong { color: var(--text); }
+    code { font-family: 'Fira Code', monospace; font-size: 0.8rem;
+      background: #1a1a24; border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.4em; }
+    .summary-box { background: #0d130d; border: 1px solid #1e2e1e; border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin-bottom: 0.75rem; }
+    .summary-box p { display: flex; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .summary-box p:last-child { margin-bottom: 0; }
+    .check { color: var(--green); flex-shrink: 0; }
+    .callout { background: #111118; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin: 0.75rem 0; }
+    a { color: var(--gold-dim); text-decoration: underline; text-underline-offset: 3px; }
+    a:hover { color: var(--gold); }
+    footer { border-top: 1px solid var(--border); padding: 2rem 0 3rem; margin-top: 4rem; }
+    .footer-inner { max-width: 720px; margin: 0 auto; padding: 0 2rem;
+      display: flex; justify-content: space-between; align-items: center; }
+    .footer-left { font-size: 0.8rem; color: var(--text-dim); line-height: 1.7; }
+    .footer-left a { color: var(--text-dim); }
+    .footer-links { display: flex; gap: 1.25rem; font-size: 0.78rem; }
+    .footer-links a { color: var(--text-dim); text-decoration: none; }
+    .footer-links a:hover { color: var(--text); }
+    @media (max-width: 600px) { .nav-links { display: none; } h1 { font-size: 1.6rem; } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">rask/</a>
+    <ul class="nav-links">
+      <li><a href="index.html#quickstart">Quick start</a></li>
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="about.html">About</a></li>
+      <li><a href="terms.html">Terms</a></li>
+      <li><a href="privacy.html">Privacy</a></li>
+      <li><a href="https://github.com/agdir/rask" target="_blank" rel="noopener">GitHub ↗</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container">
+<main>
+
+  <h1>Privacy Policy</h1>
+  <p class="page-intro">
+    Rask is a self-hosted application. We have no access to your data, your broker, or your usage.
+    This page explains what does and doesn't happen with information when you run Rask.
+  </p>
+
+  <section>
+    <h2>The short version</h2>
+    <div class="summary-box">
+      <p><span class="check">✓</span> Rask stores nothing about you or your usage.</p>
+      <p><span class="check">✓</span> No telemetry, analytics, or tracking of any kind.</p>
+      <p><span class="check">✓</span> No data ever leaves your server — Rask never phones home.</p>
+      <p><span class="check">✓</span> No account, registration, or email address required to use Rask.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What is stored</h2>
+    <p>
+      The only thing Rask writes to disk is the server configuration — your RabbitMQ host, port,
+      and credentials — stored in a <code>.env.local</code> file on the server where you run Rask.
+      This file is not committed to version control (it is listed in <code>.gitignore</code>),
+      is never sent to the browser, and is never accessible from outside your server.
+    </p>
+    <p>Nothing else is persisted anywhere. All filter states and UI preferences live in memory and reset on page refresh.</p>
+  </section>
+
+  <section>
+    <h2>Your RabbitMQ data</h2>
+    <p>
+      Queue contents, message payloads, connections, and all other broker data flow between your browser
+      and your own RabbitMQ broker — proxied through the Next.js server you deploy.
+      Agdir Drift AS has no access to any of it, ever.
+    </p>
+    <p>
+      Rask respects the privacy and terms of the RabbitMQ project. See
+      <a href="https://www.rabbitmq.com/privacy" target="_blank" rel="noopener">RabbitMQ's privacy policy</a>
+      and
+      <a href="https://www.rabbitmq.com/terms-and-conditions" target="_blank" rel="noopener">terms and conditions</a>
+      for information about the broker software itself.
+    </p>
+  </section>
+
+  <section>
+    <h2>Credentials</h2>
+    <p>
+      RabbitMQ credentials are stored server-side in <code>.env.local</code> and are never sent to the browser.
+      API routes read them at request time to authenticate against your broker.
+      They do not appear in any client-facing response, log output, or error message.
+    </p>
+  </section>
+
+  <section>
+    <h2>Third-party services</h2>
+    <p>
+      The Rask dashboard application you self-host loads no third-party scripts, fonts, or resources from
+      external CDNs at runtime. All assets are served from your own origin.
+    </p>
+    <p>
+      The public documentation site (<code>rask.agdir.farm</code>) loads fonts from Google Fonts.
+      This involves a standard HTTPS request for font files — no personally identifiable information
+      is shared beyond what is inherent in any HTTP request. The self-hosted Rask application is not affected.
+    </p>
+  </section>
+
+  <section>
+    <h2>Logs</h2>
+    <p>
+      Rask does not produce application-level logs beyond what Next.js writes to stdout by default
+      (request paths and response codes). What happens to those logs is determined entirely by the environment
+      you deploy Rask in — Agdir Drift AS has no access to them.
+    </p>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <p>Questions about privacy or data handling in Rask:</p>
+    <div class="callout">
+      <p><strong>Agdir Drift AS</strong></p>
+      <p style="color: var(--text-dim);">Krøgenes Bryggevei 19, 4841 Arendal, Norway</p>
+      <p><a href="mailto:sales@agdir.no">sales@agdir.no</a></p>
+    </div>
+    <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-dim);">Last updated: March 2026.</p>
+  </section>
+
+</main>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-left">
+      Built by <a href="https://agdir.no" target="_blank" rel="noopener">Agdir Drift AS</a> — farming as a service.<br />
+      Named after Ratatoskr, the Norse messenger squirrel.
+    </div>
+    <div class="footer-links">
+      <a href="about.html">About</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
