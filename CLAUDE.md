@@ -18,7 +18,7 @@ pnpm build    # Production build
 pnpm lint     # ESLint check
 ```
 
-No test suite is configured.
+**Before pushing:** always run `pnpm lint && pnpm build` and confirm both pass. Never push broken or failing code. Only push when lint, build, and any tests pass cleanly.
 
 ## Architecture
 
