@@ -9,6 +9,7 @@ import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
 import { useTraceStream } from "@/lib/use-trace-stream";
 import { TraceTab } from "@/components/trace-tab";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -200,77 +201,6 @@ function DetailDrawer({ channel, onClose }: { channel: Channel; onClose: () => v
   );
 }
 
-// ── sort helpers ──────────────────────────────────────────────────────────────
-
-type SortKey = "name" | "vhost" | "state" | "messages_unacknowledged" | "prefetch_count" | "consumer_count";
-
-function sortChannels(channels: Channel[], key: SortKey, dir: "asc" | "desc"): Channel[] {
-  return [...channels].sort((a, b) => {
-    let va: string | number = a[key] as string | number;
-    let vb: string | number = b[key] as string | number;
-    if (typeof va === "string") va = va.toLowerCase();
-    if (typeof vb === "string") vb = vb.toLowerCase();
-    const cmp = va < vb ? -1 : va > vb ? 1 : 0;
-    return dir === "asc" ? cmp : -cmp;
-  });
-}
-
-// ── pagination ────────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 10;
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
-
-  const visible: (number | "…")[] = [];
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) visible.push(i);
-    else if (visible[visible.length - 1] !== "…") visible.push("…");
-  }
-
-  return (
-    <div className="flex gap-1">
-      <button onClick={() => onChange(page - 1)} disabled={page === 1}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
-      {visible.map((v, i) =>
-        v === "…"
-          ? <span key={`e${i}`} className="px-2.5 py-1.5 text-muted-foreground">…</span>
-          : <button key={v} onClick={() => onChange(v as number)}
-              className={`px-2.5 py-1.5 border rounded font-medium transition-colors ${v === page ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>
-              {v}
-            </button>
-      )}
-      <button onClick={() => onChange(page + 1)} disabled={page === Math.ceil(total / PAGE_SIZE)}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">›</button>
-    </div>
-  );
-}
-
-// ── sort header cell ──────────────────────────────────────────────────────────
-
-function SortTh({
-  label, sortKey, current, dir, onSort, className,
-}: {
-  label: string; sortKey: SortKey; current: SortKey; dir: "asc" | "desc";
-  onSort: (k: SortKey) => void; className?: string;
-}) {
-  const active = current === sortKey;
-  return (
-    <th
-      className={`px-6 py-3 cursor-pointer select-none hover:text-foreground transition-colors ${active ? "text-foreground" : ""} ${className ?? ""}`}
-      onClick={() => onSort(sortKey)}
-    >
-      <div className="flex items-center gap-1">
-        {label}
-        <span className={`text-[10px] ${active ? "opacity-100" : "opacity-30"}`}>
-          {active && dir === "desc" ? "▼" : "▲"}
-        </span>
-      </div>
-    </th>
-  );
-}
-
 // ── main ──────────────────────────────────────────────────────────────────────
 
 const ALL_STATES = ["running", "idle", "flow", "blocked", "closing"] as const;
@@ -280,12 +210,9 @@ export default function ChannelsPage() {
   const [search, setSearch] = useState("");
   const [vhostFilter, setVhostFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
-  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Channel | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  const { data, isError, error } = useQuery<Channel[]>({
+  const { data, isLoading, isError, error } = useQuery<Channel[]>({
     queryKey: ["channels"],
     queryFn: async () => {
       const res = await fetch("/api/rabbitmq/channels");
@@ -314,17 +241,17 @@ export default function ChannelsPage() {
             className="pl-9 w-64"
             placeholder="Search by channel, connection, or user…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); }}
           />
         </div>
-        <Select value={vhostFilter} onValueChange={(v) => { setVhostFilter(v); setPage(1); }}>
+        <Select value={vhostFilter} onValueChange={(v) => { setVhostFilter(v); }}>
           <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Vhost: All</SelectItem>
             {vhosts.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); setPage(1); }}>
+        <Select value={stateFilter} onValueChange={(v) => { setStateFilter(v); }}>
           <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">State: All</SelectItem>
@@ -351,23 +278,89 @@ export default function ChannelsPage() {
     });
   }, [data, search, vhostFilter, stateFilter]);
 
-  const sorted = useMemo(() => sortChannels(filtered, sortKey, sortDir), [filtered, sortKey, sortDir]);
-  const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { pagedData, sortKey, sortDir, toggleSort, page, setPage, pageCount } = useDataTable({
+    data: filtered,
+    pageSize: 10,
+    defaultSortKey: "name",
+    getSortValue: (ch, key) => {
+      const map: Record<string, unknown> = {
+        name: ch.name,
+        vhost: ch.vhost,
+        state: ch.state,
+        messages_unacknowledged: ch.messages_unacknowledged,
+        prefetch_count: ch.prefetch_count,
+        consumer_count: ch.consumer_count,
+      };
+      return (map[key] as string | number) ?? "";
+    },
+  });
+
+  const columns: DataTableColumn<Channel>[] = [
+    {
+      key: "name",
+      header: "Channel",
+      sortable: true,
+      render: (ch) => <span className="font-medium font-mono text-xs">{ch.name}</span>,
+    },
+    {
+      key: "connection",
+      header: "Connection",
+      render: (ch) => (
+        <span className="text-muted-foreground max-w-[180px] truncate block">
+          {ch.connection_details?.name ?? ch.name}
+        </span>
+      ),
+    },
+    {
+      key: "vhost",
+      header: "Vhost",
+      sortable: true,
+      render: (ch) => <span className="text-muted-foreground">{ch.vhost}</span>,
+    },
+    {
+      key: "state",
+      header: "State",
+      sortable: true,
+      align: "center",
+      render: (ch) => <StateBadge state={ch.state} />,
+    },
+    {
+      key: "messages_unacknowledged",
+      header: "Unacked",
+      sortable: true,
+      align: "right",
+      render: (ch) => (
+        <span className={`font-medium tabular-nums ${ch.messages_unacknowledged > 100 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+          {ch.messages_unacknowledged.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: "prefetch_count",
+      header: "Prefetch",
+      sortable: true,
+      align: "right",
+      render: (ch) => <span className="text-muted-foreground tabular-nums">{ch.prefetch_count}</span>,
+    },
+    {
+      key: "consumer_count",
+      header: "Consumers",
+      sortable: true,
+      align: "right",
+      render: (ch) => <span className="text-muted-foreground tabular-nums">{ch.consumer_count}</span>,
+    },
+    {
+      key: "mode",
+      header: "Mode",
+      align: "center",
+      render: (ch) => <ModeBadge mode={channelMode(ch)} />,
+    },
+  ];
 
   // summary stats
   const total = data?.length ?? 0;
   const totalUnacked = data?.reduce((s, c) => s + c.messages_unacknowledged, 0) ?? 0;
   const blockedCount = data?.filter((c) => c.state === "blocked").length ?? 0;
-
-  function handleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-    setPage(1);
-  }
 
   return (
     <div className="space-y-6">
@@ -387,86 +380,26 @@ export default function ChannelsPage() {
       </div>
 
       {/* table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <SortTh label="Channel" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3" />
-                <th className="px-6 py-3">Connection</th>
-                <SortTh label="Vhost" sortKey="vhost" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3" />
-                <SortTh label="State" sortKey="state" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3 text-center" />
-                <SortTh label="Unacked" sortKey="messages_unacknowledged" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3 text-right" />
-                <SortTh label="Prefetch" sortKey="prefetch_count" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3 text-right" />
-                <SortTh label="Consumers" sortKey="consumer_count" current={sortKey} dir={sortDir} onSort={handleSort} className="px-6 py-3 text-right" />
-                <th className="px-6 py-3 text-center">Mode</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {!data ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">Loading…</td>
-                </tr>
-              ) : paged.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
-                    <p className="text-muted-foreground font-medium">No open channels</p>
-                    <p className="text-muted-foreground/60 text-xs mt-1">Channels appear when AMQP clients connect and open them.</p>
-                  </td>
-                </tr>
-              ) : (
-                paged.map((ch) => {
-                  const isBlocked = ch.state === "blocked";
-                  const highUnacked = ch.messages_unacknowledged > 100;
-                  const connName = ch.connection_details?.name ?? ch.name;
-                  const mode = channelMode(ch);
-
-                  return (
-                    <tr
-                      key={ch.name}
-                      onClick={() => setSelected(ch)}
-                      className={`cursor-pointer transition-colors ${
-                        isBlocked
-                          ? "bg-rose-50/60 dark:bg-rose-900/10 hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                          : "hover:bg-muted/30"
-                      }`}
-                    >
-                      <td className="px-6 py-4 font-medium font-mono text-xs">{ch.name}</td>
-                      <td className="px-6 py-4 text-muted-foreground max-w-[180px] truncate">{connName}</td>
-                      <td className="px-6 py-4 text-muted-foreground">{ch.vhost}</td>
-                      <td className="px-6 py-4 text-center">
-                        <StateBadge state={ch.state} />
-                      </td>
-                      <td className={`px-6 py-4 text-right font-medium tabular-nums ${highUnacked ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
-                        {ch.messages_unacknowledged.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-right text-muted-foreground tabular-nums">
-                        {ch.prefetch_count}
-                      </td>
-                      <td className="px-6 py-4 text-right text-muted-foreground tabular-nums">
-                        {ch.consumer_count}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <ModeBadge mode={mode} />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* table footer */}
-        <div className="px-6 py-3 bg-muted/30 border-t flex justify-between items-center text-sm text-muted-foreground">
-          <span>
-            {filtered.length === 0
-              ? "No channels"
-              : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
-          </span>
-          <Pagination page={page} total={filtered.length} onChange={setPage} />
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={pagedData}
+        isLoading={isLoading}
+        onRowClick={(ch) => setSelected(ch)}
+        getRowClassName={(ch) =>
+          ch.state === "blocked"
+            ? "bg-rose-50/60 dark:bg-rose-900/10"
+            : ""
+        }
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        page={page}
+        pageCount={pageCount}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        emptyMessage="No open channels"
+        pageSize={10}
+      />
     </div>
   );
 }
