@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { RabbitUser } from "@/lib/types";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useSetHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── tag config ────────────────────────────────────────────────────────────────
 
@@ -261,36 +262,6 @@ function UserDrawer({
   );
 }
 
-// ── pagination ────────────────────────────────────────────────────────────────
-
-const PAGE_SIZE = 10;
-
-function Pagination({ page, total, onChange }: { page: number; total: number; onChange: (p: number) => void }) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  if (pages <= 1) return null;
-  const visible: (number | "…")[] = [];
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1 || i === pages || (i >= page - 1 && i <= page + 1)) visible.push(i);
-    else if (visible[visible.length - 1] !== "…") visible.push("…");
-  }
-  return (
-    <div className="flex gap-1">
-      <button onClick={() => onChange(page - 1)} disabled={page === 1}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">‹</button>
-      {visible.map((v, i) =>
-        v === "…"
-          ? <span key={`e${i}`} className="px-2.5 py-1.5 text-muted-foreground">…</span>
-          : <button key={v} onClick={() => onChange(v as number)}
-              className={`px-2.5 py-1.5 border rounded font-medium transition-colors ${v === page ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}>
-              {v}
-            </button>
-      )}
-      <button onClick={() => onChange(page + 1)} disabled={page === Math.ceil(total / PAGE_SIZE)}
-        className="px-2.5 py-1.5 border rounded bg-background hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors">›</button>
-    </div>
-  );
-}
-
 // ── main ──────────────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
@@ -298,7 +269,6 @@ export default function UsersPage() {
 
   const [userSearch, setUserSearch] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
-  const [userPage, setUserPage] = useState(1);
   const [userDrawer, setUserDrawer] = useState<UserDrawerMode | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<RabbitUser | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
@@ -325,7 +295,7 @@ export default function UsersPage() {
     staleTime: Infinity,
   });
 
-  const { data: users, isError: usersError } = useQuery<RabbitUser[]>({
+  const { data: users, isLoading: usersLoading, isError: usersError } = useQuery<RabbitUser[]>({
     queryKey: ["admin-users"],
     queryFn: async () => {
       const res = await fetch("/api/rabbitmq/users");
@@ -367,7 +337,10 @@ export default function UsersPage() {
     });
   }, [users, userSearch, tagFilter]);
 
-  const pagedUsers = filteredUsers.slice((userPage - 1) * PAGE_SIZE, userPage * PAGE_SIZE);
+  const { pagedData, page, setPage, pageCount } = useDataTable({
+    data: filteredUsers,
+    pageSize: 10,
+  });
 
   async function handleDeleteUser(user: RabbitUser) {
     setDeleting((prev) => new Set(prev).add(user.name));
@@ -385,6 +358,103 @@ export default function UsersPage() {
     qc.invalidateQueries({ queryKey: ["admin-users"] });
     setUserDrawer(null);
   }
+
+  const columns: DataTableColumn<RabbitUser>[] = [
+    {
+      key: "name",
+      header: "Username",
+      render: (user) => {
+        const isYou = user.name === whoami;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{user.name}</span>
+            {isYou && (
+              <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-[10px] rounded font-bold uppercase tracking-wider">
+                You
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "tags",
+      header: "Tags",
+      render: (user) => {
+        const tags = parseTags(user.tags);
+        return tags.length === 0 ? (
+          <span className="text-muted-foreground italic text-xs">None</span>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {tags.map((t) => <TagBadge key={t} tag={t} />)}
+          </div>
+        );
+      },
+    },
+    {
+      key: "vhost_access",
+      header: "Vhost Access",
+      render: (user) => {
+        const vhostCount = vhostCountByUser[user.name] ?? 0;
+        const noPerms = vhostCount === 0;
+        return noPerms ? (
+          <span className="text-amber-600 dark:text-amber-400 text-xs font-medium flex items-center gap-1">
+            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1 L11 10 H1 Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M6 5 V7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <circle cx="6" cy="8.5" r="0.5" fill="currentColor"/>
+            </svg>
+            No permissions
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            {vhostCount} {vhostCount === 1 ? "vhost" : "vhosts"}
+          </span>
+        );
+      },
+    },
+    {
+      key: "password",
+      header: "Password",
+      align: "center",
+      render: (user) => {
+        const hasPassword = !!user.password_hash;
+        return hasPassword ? (
+          <svg className="w-4 h-4 text-emerald-500 mx-auto" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M5 8 L7 10 L11 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <svg className="w-4 h-4 text-muted-foreground/40 mx-auto" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (user) => {
+        const isYou = user.name === whoami;
+        return (
+          <div className="flex justify-end gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); if (!isYou) setDeleteConfirm(user); }}
+              disabled={isYou || deleting.has(user.name)}
+              className="p-1.5 rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title={isYou ? "Cannot delete your own account" : "Delete user"}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                <path d="M2 4 H14 M5 4 V2.5 H11 V4 M6 7 V12 M10 7 V12 M3 4 L4 14 H12 L13 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -418,10 +488,10 @@ export default function UsersPage() {
             className="w-full pl-9 pr-4 py-2 bg-background border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="Search by username…"
             value={userSearch}
-            onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
+            onChange={(e) => { setUserSearch(e.target.value); setPage(1); }}
           />
         </div>
-        <Select value={tagFilter} onValueChange={(v) => { setTagFilter(v); setUserPage(1); }}>
+        <Select value={tagFilter} onValueChange={(v) => { setTagFilter(v); setPage(1); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
@@ -432,121 +502,18 @@ export default function UsersPage() {
         </Select>
       </div>
 
-      {/* users table */}
-      <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-              <tr>
-                <th className="px-6 py-3">Username</th>
-                <th className="px-6 py-3">Tags</th>
-                <th className="px-6 py-3">Vhost Access</th>
-                <th className="px-6 py-3 text-center">Password</th>
-                <th className="px-6 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {!users ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>
-              ) : pagedUsers.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No users found</td></tr>
-              ) : (
-                pagedUsers.map((user) => {
-                  const isYou = user.name === whoami;
-                  const tags = parseTags(user.tags);
-                  const vhostCount = vhostCountByUser[user.name] ?? 0;
-                  const hasPassword = !!user.password_hash;
-                  const noPerms = vhostCount === 0;
-
-                  return (
-                    <tr key={user.name} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{user.name}</span>
-                          {isYou && (
-                            <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-[10px] rounded font-bold uppercase tracking-wider">
-                              You
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {tags.length === 0 ? (
-                          <span className="text-muted-foreground italic text-xs">None</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {tags.map((t) => <TagBadge key={t} tag={t} />)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {noPerms ? (
-                          <span className="text-amber-600 dark:text-amber-400 text-xs font-medium flex items-center gap-1">
-                            <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                              <path d="M6 1 L11 10 H1 Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                              <path d="M6 5 V7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                              <circle cx="6" cy="8.5" r="0.5" fill="currentColor"/>
-                            </svg>
-                            No permissions
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            {vhostCount} {vhostCount === 1 ? "vhost" : "vhosts"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {hasPassword ? (
-                          <svg className="w-4 h-4 text-emerald-500 mx-auto" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.4"/>
-                            <path d="M5 8 L7 10 L11 6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4 text-muted-foreground/40 mx-auto" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.4"/>
-                            <path d="M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                          </svg>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            onClick={() => setUserDrawer({ mode: "edit", user })}
-                            className="p-1.5 rounded text-muted-foreground hover:bg-muted hover:text-primary transition-colors"
-                            title="Edit user"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                              <path d="M11 2 L14 5 L5 14 H2 V11 L11 2Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => !isYou && setDeleteConfirm(user)}
-                            disabled={isYou || deleting.has(user.name)}
-                            className="p-1.5 rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={isYou ? "Cannot delete your own account" : "Delete user"}
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                              <path d="M2 4 H14 M5 4 V2.5 H11 V4 M6 7 V12 M10 7 V12 M3 4 L4 14 H12 L13 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-6 py-3 bg-muted/30 border-t flex justify-between items-center text-sm text-muted-foreground">
-          <span>
-            {filteredUsers.length === 0
-              ? "No users"
-              : `Showing ${(userPage - 1) * PAGE_SIZE + 1}–${Math.min(userPage * PAGE_SIZE, filteredUsers.length)} of ${filteredUsers.length}`}
-          </span>
-          <Pagination page={userPage} total={filteredUsers.length} onChange={setUserPage} />
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={pagedData}
+        isLoading={usersLoading}
+        onRowClick={(u) => setUserDrawer({ mode: "edit", user: u })}
+        pageSize={10}
+        page={page}
+        pageCount={pageCount}
+        totalCount={filteredUsers.length}
+        onPageChange={setPage}
+        emptyMessage="No users found"
+      />
     </div>
   );
 }
