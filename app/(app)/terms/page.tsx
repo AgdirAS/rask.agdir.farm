@@ -55,7 +55,7 @@ export default function TermsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">No warranty</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Rask is provided <strong className="text-foreground">"as is"</strong>, without warranty of any kind.
+          Rask is provided <strong className="text-foreground">&quot;as is&quot;</strong>, without warranty of any kind.
           Agdir Drift AS is not responsible for any damages, data loss, downtime, security incidents,
           or other consequences arising from the use or inability to use this software.
           You use Rask at your own risk.

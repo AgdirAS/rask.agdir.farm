@@ -80,7 +80,7 @@ describe("RabbitMQ fetch URL construction", () => {
       ok: false,
       status: 502,
       statusText: "Bad Gateway",
-      json: async () => ({}),
+      text: async () => "",
     });
     vi.stubGlobal("fetch", fetchMock);
 

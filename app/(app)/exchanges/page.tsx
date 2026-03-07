@@ -522,7 +522,7 @@ export default function ExchangesPage() {
   }
 
   const filtered = useMemo(() => {
-    let list = exchanges.filter((e) => {
+    const list = exchanges.filter((e) => {
       if (vhostFilter !== "__all__" && e.vhost !== vhostFilter) return false;
       if (typeFilter  !== "__all__" && e.type  !== typeFilter)  return false;
       if (search) {
