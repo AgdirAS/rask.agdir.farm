@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/stat-card";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
-import { Activity, X } from "lucide-react";
+import { X } from "lucide-react";
 import { relativeTime, fmtBytes, fmtBytesRate, fmtDateFull } from "@/lib/utils";
 import { useTraceStream } from "@/lib/use-trace-stream";
-import { TraceSidebar, type TraceSidebarEntity } from "@/components/trace-sidebar";
+import { TraceTab } from "@/components/trace-tab";
 
 // ── badges & icons ────────────────────────────────────────────────────────────
 
@@ -129,6 +129,32 @@ function DetailDrawer({
 }) {
   const [confirming, setConfirming] = useState(false);
 
+  type ConnectionTab = "overview" | "trace";
+  const [tab, setTab] = useState<ConnectionTab>("overview");
+  const trace = useTraceStream();
+  // connections: trace events don't carry connection metadata, show global vhost feed
+  const traceEvents = trace.events;
+
+  useEffect(() => {
+    if (tab === "trace") {
+      void trace.start(conn.vhost);
+    } else {
+      void trace.stop();
+      trace.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, conn.vhost]);
+
+  useEffect(() => {
+    return () => { void trace.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset to overview when a different connection is opened
+  useEffect(() => {
+    setTab("overview");
+  }, [conn.name]);
+
   const { data: channels, isLoading: chLoading } = useQuery<Channel[]>({
     queryKey: ["connection-channels", conn.name],
     queryFn: async () => {
@@ -165,68 +191,86 @@ function DetailDrawer({
           </Button>
         </div>
 
-        {/* drawer body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* metadata grid */}
-          <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-3">Connection Details</p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-              {[
-                ["Client", `${conn.peer_host}:${conn.peer_port}`],
-                ["User", conn.user],
-                ["Vhost", conn.vhost],
-                ["Node", conn.node],
-                ["Channels", String(conn.channels)],
-                ["SSL/TLS", conn.ssl ? "Yes" : "No"],
-                ["Connected", fmtDateFull(conn.connected_at)],
-                ["Sent total", conn.send_oct != null ? fmtBytes(conn.send_oct) : "—"],
-                ["Recv total", conn.recv_oct != null ? fmtBytes(conn.recv_oct) : "—"],
-                ["Send rate", conn.send_oct_details ? fmtBytesRate(conn.send_oct_details.rate) : "—"],
-                ["Recv rate", conn.recv_oct_details ? fmtBytesRate(conn.recv_oct_details.rate) : "—"],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-[10px] uppercase font-semibold text-muted-foreground">{k}</dt>
-                  <dd className="font-mono text-sm mt-0.5 break-all">{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          {/* channels list */}
-          <div>
-            <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-3">
-              Channels {channels ? `(${channels.length})` : ""}
-            </p>
-            {chLoading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : !channels || channels.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No open channels</p>
-            ) : (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 text-xs uppercase">
-                      <TableHead className="py-2">#</TableHead>
-                      <TableHead className="py-2">State</TableHead>
-                      <TableHead className="py-2 text-right">Consumers</TableHead>
-                      <TableHead className="py-2 text-right">Unacked</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {channels.map((ch) => (
-                      <TableRow key={ch.name}>
-                        <TableCell className="py-2 font-mono text-xs">{ch.number}</TableCell>
-                        <TableCell className="py-2"><StateBadge state={ch.state} /></TableCell>
-                        <TableCell className="py-2 text-right text-xs">{ch.consumer_count}</TableCell>
-                        <TableCell className="py-2 text-right text-xs">{ch.messages_unacknowledged}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
+        {/* Tab bar */}
+        <div className="flex border-b bg-muted/30 px-4 shrink-0">
+          {(["overview", "trace"] as ConnectionTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {t === "overview" ? "Overview" : trace.active ? "Live Trace ●" : "Live Trace"}
+            </button>
+          ))}
         </div>
+
+        {tab !== "trace" ? (
+          <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            {/* metadata grid */}
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-3">Connection Details</p>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                {[
+                  ["Client", `${conn.peer_host}:${conn.peer_port}`],
+                  ["User", conn.user],
+                  ["Vhost", conn.vhost],
+                  ["Node", conn.node],
+                  ["Channels", String(conn.channels)],
+                  ["SSL/TLS", conn.ssl ? "Yes" : "No"],
+                  ["Connected", fmtDateFull(conn.connected_at)],
+                  ["Sent total", conn.send_oct != null ? fmtBytes(conn.send_oct) : "—"],
+                  ["Recv total", conn.recv_oct != null ? fmtBytes(conn.recv_oct) : "—"],
+                  ["Send rate", conn.send_oct_details ? fmtBytesRate(conn.send_oct_details.rate) : "—"],
+                  ["Recv rate", conn.recv_oct_details ? fmtBytesRate(conn.recv_oct_details.rate) : "—"],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-[10px] uppercase font-semibold text-muted-foreground">{k}</dt>
+                    <dd className="font-mono text-sm mt-0.5 break-all">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+
+            {/* channels list */}
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-3">
+                Channels {channels ? `(${channels.length})` : ""}
+              </p>
+              {chLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : !channels || channels.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No open channels</p>
+              ) : (
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 text-xs uppercase">
+                        <TableHead className="py-2">#</TableHead>
+                        <TableHead className="py-2">State</TableHead>
+                        <TableHead className="py-2 text-right">Consumers</TableHead>
+                        <TableHead className="py-2 text-right">Unacked</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {channels.map((ch) => (
+                        <TableRow key={ch.name}>
+                          <TableCell className="py-2 font-mono text-xs">{ch.number}</TableCell>
+                          <TableCell className="py-2"><StateBadge state={ch.state} /></TableCell>
+                          <TableCell className="py-2 text-right text-xs">{ch.consumer_count}</TableCell>
+                          <TableCell className="py-2 text-right text-xs">{ch.messages_unacknowledged}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <TraceTab trace={trace} events={traceEvents} />
+          </div>
+        )}
 
         {/* drawer footer — force close */}
         <div className="border-t p-4">
@@ -286,8 +330,6 @@ export default function ConnectionsPage() {
   const [page, setPage]                 = useState(1);
   const [closing, setClosing]           = useState<Set<string>>(new Set());
   const [selected, setSelected]         = useState<Connection | null>(null);
-  const [tracedEntity, setTracedEntity] = useState<TraceSidebarEntity | null>(null);
-  const trace = useTraceStream();
 
   const { data, isError, error } = useQuery<Connection[]>({
     queryKey: ["connections"],
@@ -406,17 +448,16 @@ export default function ConnectionsPage() {
                 <TableHead>Connected</TableHead>
                 <TableHead>↑↓ Rate</TableHead>
                 <TableHead className="text-center">TLS</TableHead>
-                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {!data ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-muted-foreground py-6">Loading…</TableCell>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-6">Loading…</TableCell>
                 </TableRow>
               ) : paged.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-10">
+                  <TableCell colSpan={10} className="text-center py-10">
                     <p className="text-muted-foreground font-medium">No active connections</p>
                     <p className="text-muted-foreground text-xs mt-1">
                       {search || stateFilter !== "all" || vhostFilter !== "all" || protoFilter !== "all"
@@ -454,18 +495,6 @@ export default function ConnectionsPage() {
                         <RateCell send={conn.send_oct_details?.rate} recv={conn.recv_oct_details?.rate} />
                       </TableCell>
                       <TableCell className="text-center"><SslIcon ssl={conn.ssl} /></TableCell>
-                      <TableCell>
-                        <button
-                          title="Live trace (global feed)"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTracedEntity({ type: "connection", name: conn.name, vhost: conn.vhost });
-                          }}
-                          className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                        >
-                          <Activity className="h-3.5 w-3.5" />
-                        </button>
-                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -492,11 +521,6 @@ export default function ConnectionsPage() {
           isClosing={closing.has(selected.name)}
         />
       )}
-      <TraceSidebar
-        entity={tracedEntity}
-        trace={trace}
-        onClose={() => setTracedEntity(null)}
-      />
     </div>
   );
 }
