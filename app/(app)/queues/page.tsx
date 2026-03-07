@@ -426,6 +426,11 @@ function DetailDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reset to overview when a different queue is opened
+  useEffect(() => {
+    setTab("overview");
+  }, [queue.name, queue.vhost]);
+
   const dlx = getArg<string>(queue.arguments ?? {}, "x-dead-letter-exchange");
   const ttl = getArg<number>(queue.arguments ?? {}, "x-message-ttl");
   const isStream = queue.type === "stream";
