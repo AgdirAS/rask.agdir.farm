@@ -4,29 +4,19 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Vhost, VhostPermission } from "@/lib/types";
 import {
   Plus,
-  ChevronUp,
-  ChevronDown,
-  ArrowUpDown,
   X,
   AlertTriangle,
   Trash2,
   ShieldAlert,
 } from "lucide-react";
 import { useSetHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, useDataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -74,52 +64,6 @@ function ClusterDots({ state }: { state: Record<string, string> | undefined }) {
   );
 }
 
-// ── sort button ───────────────────────────────────────────────────────────────
-
-type SortKey = "name" | "messages" | "messages_ready" | "messages_unacknowledged";
-
-function SortButton({
-  children,
-  k,
-  active,
-  dir,
-  onSort,
-}: {
-  children: React.ReactNode;
-  k: SortKey;
-  active: SortKey;
-  dir: "asc" | "desc";
-  onSort: (k: SortKey) => void;
-}) {
-  return (
-    <button
-      className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide hover:text-foreground transition-colors"
-      onClick={() => onSort(k)}
-    >
-      {children}
-      {active === k
-        ? dir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-        : <ArrowUpDown className="h-3 w-3 opacity-40" />}
-    </button>
-  );
-}
-
-// ── skeleton ──────────────────────────────────────────────────────────────────
-
-function TableSkeleton() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: 8 }).map((_, j) => (
-            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-          ))}
-        </TableRow>
-      ))}
-    </>
-  );
-}
-
 // ── detail drawer ─────────────────────────────────────────────────────────────
 
 interface DrawerProps {
@@ -128,6 +72,57 @@ interface DrawerProps {
   onDeleted: () => void;
   onTracingToggled: () => void;
 }
+
+const permissionColumns: DataTableColumn<VhostPermission>[] = [
+  {
+    key: "user",
+    header: "User",
+    render: (p) => <span className="font-medium truncate">{p.user}</span>,
+  },
+  {
+    key: "configure",
+    header: "Configure",
+    render: (p) => <span className="font-mono text-[11px] text-muted-foreground truncate">{p.configure}</span>,
+  },
+  {
+    key: "write",
+    header: "Write",
+    render: (p) => <span className="font-mono text-[11px] text-muted-foreground truncate">{p.write}</span>,
+  },
+  {
+    key: "read",
+    header: "Read",
+    render: (p) => <span className="font-mono text-[11px] text-muted-foreground truncate">{p.read}</span>,
+  },
+];
+
+type ClusterStateRow = { node: string; state: string };
+
+const clusterStateColumns: DataTableColumn<ClusterStateRow>[] = [
+  {
+    key: "node",
+    header: "Node",
+    render: (r) => <span className="text-sm font-mono truncate">{r.node}</span>,
+  },
+  {
+    key: "state",
+    header: "State",
+    align: "right",
+    render: (r) => (
+      <div className="flex items-center justify-end gap-1.5">
+        <span
+          className={cn(
+            "h-2 w-2 rounded-full",
+            r.state === "running" ? "bg-green-500" :
+            r.state === "stopped" ? "bg-red-500" :
+            "bg-muted-foreground/40",
+          )}
+        />
+        <span className="text-xs text-muted-foreground">{r.state}</span>
+      </div>
+    ),
+  },
+];
 
 function VhostDrawer({ vhost, onClose, onDeleted, onTracingToggled }: DrawerProps) {
   const [deleteInput, setDeleteInput] = useState("");
@@ -160,6 +155,10 @@ function VhostDrawer({ vhost, onClose, onDeleted, onTracingToggled }: DrawerProp
 
   const isDefault_ = isDefault(vhost.name);
   const tags = normalizeTags(vhost.tags);
+
+  const clusterStateRows: ClusterStateRow[] = vhost.cluster_state
+    ? Object.entries(vhost.cluster_state).map(([node, state]) => ({ node, state }))
+    : [];
 
   async function handleDelete() {
     if (deleteInput !== vhost!.name) return;
@@ -251,27 +250,15 @@ function VhostDrawer({ vhost, onClose, onDeleted, onTracingToggled }: DrawerProp
           )}
 
           {/* cluster state */}
-          {vhost.cluster_state && Object.keys(vhost.cluster_state).length > 0 && (
+          {clusterStateRows.length > 0 && (
             <div>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Cluster State</p>
-              <div className="space-y-1.5">
-                {Object.entries(vhost.cluster_state).map(([node, state]) => (
-                  <div key={node} className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-2">
-                    <span className="text-sm font-mono truncate">{node}</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full",
-                          state === "running" ? "bg-green-500" :
-                          state === "stopped" ? "bg-red-500" :
-                          "bg-muted-foreground/40",
-                        )}
-                      />
-                      <span className="text-xs text-muted-foreground">{state}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <DataTable
+                columns={clusterStateColumns}
+                data={clusterStateRows}
+                pageSize={0}
+                emptyMessage="No cluster state"
+              />
             </div>
           )}
 
@@ -284,22 +271,13 @@ function VhostDrawer({ vhost, onClose, onDeleted, onTracingToggled }: DrawerProp
               <div className="space-y-1">
                 {[1,2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
-            ) : permissions && permissions.length > 0 ? (
-              <div className="rounded-md border divide-y text-sm">
-                <div className="grid grid-cols-4 gap-2 px-3 py-1.5 bg-muted/50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span>User</span><span>Configure</span><span>Write</span><span>Read</span>
-                </div>
-                {permissions.map((p) => (
-                  <div key={p.user} className="grid grid-cols-4 gap-2 px-3 py-2 items-center">
-                    <span className="font-medium truncate">{p.user}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground truncate">{p.configure}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground truncate">{p.write}</span>
-                    <span className="font-mono text-[11px] text-muted-foreground truncate">{p.read}</span>
-                  </div>
-                ))}
-              </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No permissions defined.</p>
+              <DataTable
+                columns={permissionColumns}
+                data={permissions ?? []}
+                pageSize={0}
+                emptyMessage="No permissions defined."
+              />
             )}
           </div>
 
@@ -515,14 +493,102 @@ function AddVhostDrawer({ open, onClose, onCreated }: AddDrawerProps) {
   );
 }
 
+// ── vhost table columns ───────────────────────────────────────────────────────
+
+const vhostColumns: DataTableColumn<Vhost>[] = [
+  {
+    key: "name",
+    header: "Name",
+    sortable: true,
+    render: (vhost) => {
+      const isDefault_ = isDefault(vhost.name);
+      const noMessages = !vhost.messages || vhost.messages === 0;
+      return (
+        <div className="flex items-center gap-2">
+          <span className={cn("font-mono text-sm font-medium", noMessages && !isDefault_ && "text-muted-foreground/70")}>
+            {vhost.name}
+          </span>
+          {isDefault_ && (
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              default
+            </span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    key: "description",
+    header: "Description",
+    render: (vhost) => (
+      <span className="text-sm text-muted-foreground max-w-[180px] truncate block">
+        {vhost.description ?? ""}
+      </span>
+    ),
+  },
+  {
+    key: "messages_ready",
+    header: "Ready",
+    sortable: true,
+    align: "right",
+    render: (vhost) => (
+      <span className="text-sm tabular-nums">{formatCount(vhost.messages_ready)}</span>
+    ),
+  },
+  {
+    key: "messages_unacknowledged",
+    header: "Unacked",
+    sortable: true,
+    align: "right",
+    render: (vhost) => (
+      <span className="text-sm tabular-nums">{formatCount(vhost.messages_unacknowledged)}</span>
+    ),
+  },
+  {
+    key: "pub_rate",
+    header: "Pub rate",
+    align: "right",
+    render: (vhost) => (
+      <span className="text-sm tabular-nums text-muted-foreground">
+        {formatRate(vhost.message_stats?.publish_details?.rate)}
+      </span>
+    ),
+  },
+  {
+    key: "del_rate",
+    header: "Del rate",
+    align: "right",
+    render: (vhost) => (
+      <span className="text-sm tabular-nums text-muted-foreground">
+        {formatRate(vhost.message_stats?.deliver_get_details?.rate)}
+      </span>
+    ),
+  },
+  {
+    key: "tracing",
+    header: "Tracing",
+    render: (vhost) =>
+      vhost.tracing ? (
+        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-3 w-3" /> on
+        </span>
+      ) : (
+        <span className="text-muted-foreground/40 text-xs">—</span>
+      ),
+  },
+  {
+    key: "nodes",
+    header: "Nodes",
+    render: (vhost) => <ClusterDots state={vhost.cluster_state} />,
+  },
+];
+
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default function VhostsPage() {
   const queryClient = useQueryClient();
   const [selected,  setSelected]  = useState<Vhost | null>(null);
   const [addOpen,   setAddOpen]   = useState(false);
-  const [sortKey,   setSortKey]   = useState<SortKey>("name");
-  const [sortDir,   setSortDir]   = useState<"asc" | "desc">("asc");
 
   useSetHeaderActions(
     <Button size="sm" className="gap-2" onClick={() => setAddOpen(true)}>
@@ -541,24 +607,23 @@ export default function VhostsPage() {
     refetchInterval: 10_000,
   });
 
-  function toggleSort(k: SortKey) {
-    if (sortKey === k) setSortDir((d) => d === "asc" ? "desc" : "asc");
-    else { setSortKey(k); setSortDir("asc"); }
-  }
-
-  const sorted = useMemo(() => {
-    const list = [...vhosts].sort((a, b) => {
-      let cmp = 0;
-      if      (sortKey === "name")                    cmp = a.name.localeCompare(b.name);
-      else if (sortKey === "messages")                cmp = (a.messages ?? 0) - (b.messages ?? 0);
-      else if (sortKey === "messages_ready")          cmp = (a.messages_ready ?? 0) - (b.messages_ready ?? 0);
-      else if (sortKey === "messages_unacknowledged") cmp = (a.messages_unacknowledged ?? 0) - (b.messages_unacknowledged ?? 0);
-      return sortDir === "desc" ? -cmp : cmp;
-    });
-    const defaults = list.filter((v) => isDefault(v.name));
-    const rest     = list.filter((v) => !isDefault(v.name));
+  // Pin the default vhost ("/") to the top after sorting
+  const pinnedVhosts = useMemo(() => {
+    const defaults = vhosts.filter((v) => isDefault(v.name));
+    const rest     = vhosts.filter((v) => !isDefault(v.name));
     return [...defaults, ...rest];
-  }, [vhosts, sortKey, sortDir]);
+  }, [vhosts]);
+
+  const { pagedData: sortedData, sortKey, sortDir, toggleSort } = useDataTable({
+    data: pinnedVhosts,
+    pageSize: 0,
+    defaultSortKey: "name",
+    getSortValue: (v, key) => {
+      if (key === "messages_ready") return v.messages_ready ?? 0;
+      if (key === "messages_unacknowledged") return v.messages_unacknowledged ?? 0;
+      return v.name;
+    },
+  });
 
   const totalMessages  = vhosts.reduce((s, v) => s + (v.messages ?? 0), 0);
   const tracingCount   = vhosts.filter((v) => v.tracing).length;
@@ -605,96 +670,19 @@ export default function VhostsPage() {
       )}
 
       {/* table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <SortButton k="name" active={sortKey} dir={sortDir} onSort={toggleSort}>Name</SortButton>
-              </TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">
-                <SortButton k="messages_ready" active={sortKey} dir={sortDir} onSort={toggleSort}>
-                  Ready
-                </SortButton>
-              </TableHead>
-              <TableHead className="text-right">
-                <SortButton k="messages_unacknowledged" active={sortKey} dir={sortDir} onSort={toggleSort}>
-                  Unacked
-                </SortButton>
-              </TableHead>
-              <TableHead className="text-right">Pub rate</TableHead>
-              <TableHead className="text-right">Del rate</TableHead>
-              <TableHead>Tracing</TableHead>
-              <TableHead>Nodes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableSkeleton />
-            ) : sorted.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">No virtual hosts found</TableCell>
-              </TableRow>
-            ) : (
-              sorted.map((vhost) => {
-                const isDefault_ = isDefault(vhost.name);
-                const publishRate = vhost.message_stats?.publish_details?.rate;
-                const deliverRate = vhost.message_stats?.deliver_get_details?.rate;
-                const noMessages  = !vhost.messages || vhost.messages === 0;
-
-                return (
-                  <TableRow
-                    key={vhost.name}
-                    className={cn("cursor-pointer", isDefault_ && "bg-muted/20")}
-                    onClick={() => setSelected(vhost)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className={cn("font-mono text-sm font-medium", noMessages && !isDefault_ && "text-muted-foreground/70")}>
-                          {vhost.name}
-                        </span>
-                        {isDefault_ && (
-                          <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                            default
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
-                      {vhost.description ?? ""}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {formatCount(vhost.messages_ready)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {formatCount(vhost.messages_unacknowledged)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {formatRate(publishRate)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                      {formatRate(deliverRate)}
-                    </TableCell>
-                    <TableCell>
-                      {vhost.tracing ? (
-                        <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">
-                          <AlertTriangle className="h-3 w-3" /> on
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <ClusterDots state={vhost.cluster_state} />
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        columns={vhostColumns}
+        data={sortedData}
+        pageSize={0}
+        isLoading={isLoading}
+        skeletonRows={5}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        onRowClick={(vhost) => setSelected(vhost)}
+        getRowClassName={(vhost) => cn(isDefault(vhost.name) && "bg-muted/20")}
+        emptyMessage="No virtual hosts found"
+      />
 
       <VhostDrawer
         vhost={freshSelected}
