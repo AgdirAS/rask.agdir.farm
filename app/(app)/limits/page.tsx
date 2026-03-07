@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useSetHeaderActions } from "@/components/layout/header-actions-context";
+import { DataTable, type DataTableColumn } from "@/components/data-table";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -199,6 +200,41 @@ export default function LimitsPage() {
 
   function openEdit(limit: VhostLimit) { setEditing(limit); setDrawerOpen(true); }
 
+  const columns: DataTableColumn<VhostLimit>[] = [
+    {
+      key: "vhost",
+      header: "Virtual Host",
+      render: (limit) => <span className="font-mono font-medium">{limit.vhost}</span>,
+    },
+    {
+      key: "max-connections",
+      header: "Max Connections",
+      render: (limit) => fmtLimit(limit.value["max-connections"]),
+    },
+    {
+      key: "max-queues",
+      header: "Max Queues",
+      render: (limit) => fmtLimit(limit.value["max-queues"]),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      render: (limit) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); void handleDelete(limit); }}
+          disabled={deleting === limit.vhost}
+          className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
+          title="Delete"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+            <path d="M3 5h10M6 5V3h4v2M7 8v4M9 8v4M4 5l1 9h6l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="flex flex-col h-full">
       {/* Content */}
@@ -209,61 +245,14 @@ export default function LimitsPage() {
           </div>
         )}
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-5 py-2 text-left font-medium">Virtual Host</th>
-              <th className="px-5 py-2 text-left font-medium">Max Connections</th>
-              <th className="px-5 py-2 text-left font-medium">Max Queues</th>
-              <th className="px-5 py-2 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {!limits ? (
-              <tr><td colSpan={4} className="px-5 py-6 text-center text-muted-foreground">Loading…</td></tr>
-            ) : limits.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-5 py-10 text-center">
-                  <p className="text-muted-foreground font-medium">No limits configured</p>
-                  <p className="text-muted-foreground text-xs mt-1 max-w-sm mx-auto">
-                    Consider setting limits per vhost to protect the broker in production.
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              limits.map((limit) => (
-                <tr key={limit.vhost} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-5 py-3 font-mono font-medium">{limit.vhost}</td>
-                  <td className="px-5 py-3">{fmtLimit(limit.value["max-connections"])}</td>
-                  <td className="px-5 py-3">{fmtLimit(limit.value["max-queues"])}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        onClick={() => openEdit(limit)}
-                        className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-primary transition-colors"
-                        title="Edit"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                          <path d="M11.5 2.5L13.5 4.5L5.5 12.5H3.5V10.5L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(limit)}
-                        disabled={deleting === limit.vhost}
-                        className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-destructive transition-colors disabled:opacity-40"
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-                          <path d="M3 5h10M6 5V3h4v2M7 8v4M9 8v4M4 5l1 9h6l1-9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        <DataTable
+          columns={columns}
+          data={limits ?? []}
+          isLoading={!limits}
+          pageSize={0}
+          onRowClick={(limit) => openEdit(limit)}
+          emptyMessage="No limits configured"
+        />
       </div>
 
       {drawerOpen && (
