@@ -8,7 +8,7 @@ import { useTheme } from "next-themes";
 import { useState, useEffect } from "react";
 import {
   Sun, Moon, Monitor, ChevronDown,
-  Settings, Users, KeyRound, Database, Globe, SlidersHorizontal, Settings2, Flag, Send,
+  Settings, Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Overview } from "@/lib/types";
-import { NAV_ITEMS } from "@/components/layout/nav-config";
+import { NAV_ITEMS, ADMIN_ITEMS } from "@/components/layout/nav-config";
 
 // ── quick-action bar (theme · publish · admin) ────────────────────────────────
 
@@ -28,15 +28,6 @@ const THEME_OPTIONS = [
   { value: "system", label: "System", icon: Monitor },
 ] as const;
 
-const ADMIN_ITEMS = [
-  { href: "/users",         label: "Users",         icon: Users },
-  { href: "/permissions",   label: "Permissions",   icon: KeyRound },
-  { href: "/vhosts",        label: "Virtual Hosts", icon: Globe },
-  { href: "/limits",        label: "Vhost Limits",  icon: SlidersHorizontal },
-  { href: "/parameters",    label: "Parameters",    icon: Settings2 },
-  { href: "/feature-flags", label: "Feature Flags", icon: Flag },
-  { href: "/definitions",   label: "Definitions",   icon: Database },
-] as const;
 
 const iconBtn = "rounded-md p-1.5 transition-colors text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 const iconBtnActive = "bg-sidebar-accent text-sidebar-accent-foreground";
@@ -200,15 +191,29 @@ export function Sidebar({
       </nav>
 
       {/* sidebar footer */}
-      <div className="border-t px-3 py-2 text-[10px] text-muted-foreground space-y-1">
-        <div className="flex items-center justify-between gap-2">
-          <span>v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}</span>
-          <Link href="/docs" className="hover:text-foreground transition-colors">About</Link>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-          <span className="opacity-30">·</span>
+      <div className="border-t px-3 py-2 text-[10px] text-muted-foreground space-y-1.5">
+        <div>© 2026 Agdir Drift AS · v{process.env.NEXT_PUBLIC_APP_VERSION ?? "dev"}</div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <Link href="/docs"    className="hover:text-foreground transition-colors">About</Link>
           <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link href="/terms"   className="hover:text-foreground transition-colors">Terms</Link>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <span className="text-muted-foreground/60">RabbitMQ:</span>
+          {[
+            { href: "api/",                                                    label: "HTTP API" },
+            { href: "https://www.rabbitmq.com/docs",                          label: "Docs" },
+            { href: "https://www.rabbitmq.com/tutorials",                     label: "Tutorials" },
+            { href: "https://www.rabbitmq.com/release-information",           label: "Releases" },
+            { href: "https://www.rabbitmq.com/commercial-offerings",          label: "Support" },
+            { href: "https://github.com/rabbitmq/rabbitmq-server/discussions",label: "Discussions" },
+            { href: "https://rabbitmq.com/discord/",                          label: "Discord" },
+            { href: "https://www.rabbitmq.com/docs/plugins",                  label: "Plugins" },
+            { href: "https://www.rabbitmq.com/github",                        label: "GitHub" },
+          ].map(({ href, label }) => (
+            <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors">{label}</a>
+          ))}
         </div>
       </div>
 

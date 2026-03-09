@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { NAV_ITEMS } from "@/components/layout/nav-config";
+import { ALL_NAV_ITEMS } from "@/components/layout/nav-config";
 import { useHeaderActions } from "@/components/layout/header-actions-context";
 
 // ── count + help subtitles ────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ const COUNT_QUERIES: Partial<Record<string, { key: string[]; url: string; subtit
 
 const EXTRA_SUBTITLES: Partial<Record<string, string>> = {
   "/definitions": "Definitions are a complete JSON snapshot of the broker's configuration — all vhosts, exchanges, queues, bindings, users, permissions, and policies. Exporting creates a portable backup; importing merges the snapshot into the live broker without deleting existing resources. Use definitions to replicate topology across environments, version-control your broker config, or recover after a failure.",
-  "/docs":     "Rask is an open source RabbitMQ management dashboard by Agdir Drift AS. Named after Ratatoskr, the Norse messenger squirrel.",
+  "/docs":    "Rask is an open source RabbitMQ management dashboard by Agdir Drift AS. Named after Ratatoskr, the Norse messenger squirrel.",
   "/terms":    "Rask is released under the Business Source License 1.1. Free for internal use. Commercial use requires a license — contact sales@agdir.no.",
   "/privacy":  "Rask stores nothing about you or your usage. No telemetry, no analytics, no data leaves your server.",
 };
@@ -66,7 +66,7 @@ export function Header() {
   const pathname = usePathname();
   const [infoOpen, setInfoOpen] = useState(false);
 
-  const navItem = NAV_ITEMS.find((n) => n.href === pathname);
+  const navItem = ALL_NAV_ITEMS.find((n) => n.href === pathname);
   const title = navItem?.label ?? pathname.split("/").filter(Boolean).join(" / ");
   const Icon = navItem?.icon;
 
@@ -80,14 +80,14 @@ export function Header() {
     : null;
 
   return (
-    <div className="shrink-0 border-b">
+    <div className="shrink-0 border-b border-sidebar-border bg-sidebar text-sidebar-foreground">
       <header className="flex h-14 items-center px-6 gap-4">
         {/* left: title */}
         <div className="flex items-center gap-2 min-w-0">
-          {Icon && <Icon />}
-          <h1 className="text-base font-semibold truncate">{title}</h1>
+          {Icon && <Icon className="text-sidebar-foreground/70" />}
+          <h1 className="text-base font-semibold truncate text-sidebar-foreground">{title}</h1>
           {count !== undefined && (
-            <span className="px-2 py-0.5 bg-muted rounded-full text-xs font-semibold text-muted-foreground shrink-0">
+            <span className="px-2 py-0.5 bg-sidebar-accent rounded-full text-xs font-semibold text-sidebar-accent-foreground shrink-0">
               {count}
             </span>
           )}
@@ -97,12 +97,12 @@ export function Header() {
         {/* right: updated + info */}
         <div className="ml-auto flex items-center gap-3 shrink-0">
           {updatedLabel && (
-            <span className="text-xs font-mono text-muted-foreground">
+            <span className="text-xs font-mono text-sidebar-foreground/50">
               {updatedLabel}
             </span>
           )}
           {subtitle && (
-            <Button variant="outline" size="sm" onClick={() => setInfoOpen((o) => !o)}>
+            <Button variant="outline" size="sm" className="bg-transparent border-sidebar-foreground/30 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" onClick={() => setInfoOpen((o) => !o)}>
               ?
             </Button>
           )}
@@ -110,7 +110,7 @@ export function Header() {
       </header>
       <div className={`grid transition-all duration-200 ease-in-out ${infoOpen && subtitle ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
         <div className="overflow-hidden">
-          <div className="border-t bg-muted/40 px-6 py-4 text-sm leading-relaxed max-w-3xl">
+          <div className="border-t border-sidebar-border bg-sidebar-accent/30 px-6 py-4 text-sm leading-relaxed max-w-3xl text-sidebar-accent-foreground">
             {subtitle}
           </div>
         </div>

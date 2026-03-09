@@ -6,11 +6,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Server, ChevronDown, Plus, Loader2, X, CheckCircle, AlertCircle,
+  Server, ChevronDown, Plus, Loader2, X, CheckCircle, AlertCircle, Trash2, Copy,
 } from "lucide-react";
 import type { EnvEntry, EnvListResponse } from "@/lib/types";
 import { SESSION_ENV_KEY } from "@/lib/constants";
+
+function parseManagementUrl(url: string) {
+  try {
+    const u = new URL(url);
+    return {
+      scheme: u.protocol.replace(":", "") as "http" | "https",
+      host: u.hostname,
+      mgmtPort: u.port || (u.protocol === "https:" ? "443" : "80"),
+    };
+  } catch {
+    return { scheme: "http" as const, host: "localhost", mgmtPort: "15672" };
+  }
+}
+
+function composeManagementUrl(scheme: string, host: string, port: string) {
+  return `${scheme}://${host}:${port}`;
+}
 
 export type GatewayReason = "first-run" | "no-connection" | "switch";
 
@@ -61,6 +79,7 @@ interface RowState {
   testError: string;
   connecting: boolean;
   saveError: string;
+  deleteConfirm: boolean;
 }
 
 function makeRow(entry: EnvEntry, expanded = false): RowState {
@@ -72,6 +91,7 @@ function makeRow(entry: EnvEntry, expanded = false): RowState {
     testError: "",
     connecting: false,
     saveError: "",
+    deleteConfirm: false,
   };
 }
 
@@ -107,8 +127,8 @@ export function EnvGateway({ reason, activeSlug, onReady, onDismiss }: EnvGatewa
     setRows((rs) =>
       rs.map((r, idx) =>
         idx === i
-          ? { ...r, expanded: !r.expanded }
-          : { ...r, expanded: false }
+          ? { ...r, expanded: !r.expanded, deleteConfirm: false }
+          : { ...r, expanded: false, deleteConfirm: false }
       )
     );
     setNewRow(null);
@@ -171,6 +191,37 @@ export function EnvGateway({ reason, activeSlug, onReady, onDismiss }: EnvGatewa
       updateRow(i, {
         saving: false,
         saveError: err instanceof Error ? err.message : "Save failed",
+      });
+    }
+  }
+
+  async function handleDuplicate(i: number) {
+    const src = rows[i].draft;
+    const payload = { ...src, slug: randomSlug(), name: `${src.name || src.slug} (copy)` };
+    try {
+      const res = await fetch("/api/envs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = (await res.json()) as { data?: EnvEntry; error?: string };
+      if (json.error) throw new Error(json.error);
+      if (json.data) setRows((rs) => [...rs, makeRow(json.data!, false)]);
+    } catch {
+      // silently ignore — duplicate failure is non-critical
+    }
+  }
+
+  async function handleDelete(i: number) {
+    const slug = rows[i].draft.slug;
+    try {
+      const res = await fetch(`/api/envs/${slug}`, { method: "DELETE" });
+      const json = (await res.json()) as { error?: string };
+      if (json.error) throw new Error(json.error);
+      setRows((rs) => rs.filter((_, idx) => idx !== i));
+    } catch (err) {
+      updateRow(i, {
+        saveError: err instanceof Error ? err.message : "Delete failed",
       });
     }
   }
@@ -279,29 +330,41 @@ export function EnvGateway({ reason, activeSlug, onReady, onDismiss }: EnvGatewa
                   </div>
                 </div>
 
-                {row.testState === "ok" && <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />}
-                {row.testState === "error" && <AlertCircle className="h-4 w-4 text-destructive shrink-0" />}
+                {!row.expanded && row.testState === "ok" && <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />}
+                {!row.expanded && row.testState === "error" && <AlertCircle className="h-4 w-4 text-destructive shrink-0" />}
 
-                <Button
-                  size="sm" variant="outline"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => handleTest(i)}
-                  disabled={row.testState === "testing"}
-                >
-                  {row.testState === "testing"
-                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                    : "Test"}
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => handleConnect(i)}
-                  disabled={row.connecting}
-                >
-                  {row.connecting
-                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                    : "Connect"}
-                </Button>
+                {!row.expanded && (
+                  <>
+                    <Button
+                      size="sm" variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleTest(i)}
+                      disabled={row.testState === "testing"}
+                    >
+                      {row.testState === "testing"
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : "Test"}
+                    </Button>
+                    <Button
+                      size="sm" variant="outline"
+                      className="h-7 px-2"
+                      onClick={() => handleDuplicate(i)}
+                      title="Duplicate"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleConnect(i)}
+                      disabled={row.connecting}
+                    >
+                      {row.connecting
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : "Connect"}
+                    </Button>
+                  </>
+                )}
                 <button
                   onClick={() => toggleExpand(i)}
                   className="p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -320,81 +383,127 @@ export function EnvGateway({ reason, activeSlug, onReady, onDismiss }: EnvGatewa
               {/* expanded form */}
               {row.expanded && (
                 <div className="border-t px-3 py-3 space-y-2.5">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2 space-y-1">
-                      <Label className="text-xs">Display Name</Label>
-                      <Input
-                        placeholder={row.draft.slug}
-                        value={row.draft.name}
-                        onChange={(e) => setDraftField(i, "name", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-1">
-                      <Label className="text-xs">Management URL</Label>
-                      <Input
-                        placeholder="http://localhost:15672"
-                        value={row.draft.managementUrl}
-                        onChange={(e) => setDraftField(i, "managementUrl", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">AMQP Port</Label>
-                      <Input
-                        placeholder="5672"
-                        value={row.draft.amqpPort}
-                        onChange={(e) => setDraftField(i, "amqpPort", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">User</Label>
-                      <Input
-                        placeholder="guest"
-                        value={row.draft.user}
-                        onChange={(e) => setDraftField(i, "user", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Password</Label>
-                      <Input
-                        type="password"
-                        placeholder="guest"
-                        value={row.draft.password}
-                        onChange={(e) => setDraftField(i, "password", e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-1">
-                      <Label className="text-xs">VHost</Label>
-                      <Input
-                        placeholder="/"
-                        value={row.draft.vhost}
-                        onChange={(e) => setDraftField(i, "vhost", e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const { scheme, host, mgmtPort } = parseManagementUrl(row.draft.managementUrl);
+                    return (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs">Display Name</Label>
+                          <Input
+                            placeholder={row.draft.slug}
+                            value={row.draft.name}
+                            onChange={(e) => setDraftField(i, "name", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs">Server</Label>
+                          <div className="flex gap-1.5">
+                            <Select value={scheme} onValueChange={(v) => setDraftField(i, "managementUrl", composeManagementUrl(v, host, mgmtPort))}>
+                              <SelectTrigger className="w-24 shrink-0">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="http">http</SelectItem>
+                                <SelectItem value="https">https</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              placeholder="localhost"
+                              value={host}
+                              onChange={(e) => setDraftField(i, "managementUrl", composeManagementUrl(scheme, e.target.value, mgmtPort))}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Management Port</Label>
+                          <Input
+                            placeholder="15672"
+                            value={mgmtPort}
+                            onChange={(e) => setDraftField(i, "managementUrl", composeManagementUrl(scheme, host, e.target.value))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">AMQP Port</Label>
+                          <Input
+                            placeholder="5672"
+                            value={row.draft.amqpPort}
+                            onChange={(e) => setDraftField(i, "amqpPort", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">User</Label>
+                          <Input
+                            placeholder="guest"
+                            value={row.draft.user}
+                            onChange={(e) => setDraftField(i, "user", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Password</Label>
+                          <Input
+                            type="password"
+                            placeholder="guest"
+                            value={row.draft.password}
+                            onChange={(e) => setDraftField(i, "password", e.target.value)}
+                          />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs">VHost</Label>
+                          <Input
+                            placeholder="/"
+                            value={row.draft.vhost}
+                            onChange={(e) => setDraftField(i, "vhost", e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {row.saveError && <p className="text-xs text-destructive">{row.saveError}</p>}
                   {row.testState === "error" && row.testError && (
                     <p className="text-xs text-destructive">{row.testError}</p>
                   )}
                   <div className="flex gap-2">
-                    <Button
-                      size="sm" variant="outline"
-                      onClick={() => handleTest(i)}
-                      disabled={row.testState === "testing"}
-                    >
-                      {row.testState === "testing"
-                        ? <Loader2 className="h-3 w-3 animate-spin" />
-                        : row.testState === "ok"
-                          ? <><CheckCircle className="h-3 w-3 mr-1 text-emerald-500" />Tested</>
-                          : "Test"}
-                    </Button>
-                    <Button
-                      size="sm" variant="outline" className="flex-1"
-                      onClick={() => handleSave(i)}
-                      disabled={row.saving}
-                    >
-                      {row.saving && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
-                      {row.saving ? "Saving…" : "Save"}
-                    </Button>
+                    {row.deleteConfirm ? (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => updateRow(i, { deleteConfirm: false })}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleDelete(i)}>
+                          Delete
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => toggleExpand(i)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm" variant="secondary"
+                          onClick={() => handleTest(i)}
+                          disabled={row.testState === "testing"}
+                        >
+                          {row.testState === "testing"
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : row.testState === "ok"
+                              ? <><CheckCircle className="h-3 w-3 mr-1 text-emerald-500" />Tested</>
+                              : "Test"}
+                        </Button>
+                        <Button
+                          size="sm" className="flex-1"
+                          onClick={() => handleSave(i)}
+                          disabled={row.saving}
+                        >
+                          {row.saving && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
+                          {row.saving ? "Saving…" : "Save"}
+                        </Button>
+                        <Button
+                          size="sm" variant="outline" className="text-destructive border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => updateRow(i, { deleteConfirm: true })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -408,59 +517,83 @@ export function EnvGateway({ reason, activeSlug, onReady, onDismiss }: EnvGatewa
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   New Environment
                 </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">Display Name</Label>
-                    <Input
-                      placeholder="Production"
-                      value={newRow.name}
-                      autoFocus
-                      onChange={(e) => setNewRow((r) => r ? { ...r, name: e.target.value, slugError: undefined } : r)}
-                    />
-                    {newRow.slugError && <p className="text-xs text-destructive">{newRow.slugError}</p>}
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">Management URL</Label>
-                    <Input
-                      placeholder="http://localhost:15672"
-                      value={newRow.managementUrl}
-                      onChange={(e) => setNewRow((r) => r ? { ...r, managementUrl: e.target.value } : r)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">AMQP Port</Label>
-                    <Input
-                      placeholder="5672"
-                      value={newRow.amqpPort}
-                      onChange={(e) => setNewRow((r) => r ? { ...r, amqpPort: e.target.value } : r)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">User</Label>
-                    <Input
-                      placeholder="guest"
-                      value={newRow.user}
-                      onChange={(e) => setNewRow((r) => r ? { ...r, user: e.target.value } : r)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Password</Label>
-                    <Input
-                      type="password"
-                      placeholder="guest"
-                      value={newRow.password}
-                      onChange={(e) => setNewRow((r) => r ? { ...r, password: e.target.value } : r)}
-                    />
-                  </div>
-                  <div className="col-span-2 space-y-1">
-                    <Label className="text-xs">VHost</Label>
-                    <Input
-                      placeholder="/"
-                      value={newRow.vhost}
-                      onChange={(e) => setNewRow((r) => r ? { ...r, vhost: e.target.value } : r)}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const { scheme, host, mgmtPort } = parseManagementUrl(newRow.managementUrl);
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs">Display Name</Label>
+                        <Input
+                          placeholder="Production"
+                          value={newRow.name}
+                          autoFocus
+                          onChange={(e) => setNewRow((r) => r ? { ...r, name: e.target.value, slugError: undefined } : r)}
+                        />
+                        {newRow.slugError && <p className="text-xs text-destructive">{newRow.slugError}</p>}
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs">Server</Label>
+                        <div className="flex gap-1.5">
+                          <Select value={scheme} onValueChange={(v) => setNewRow((r) => r ? { ...r, managementUrl: composeManagementUrl(v, host, mgmtPort) } : r)}>
+                            <SelectTrigger className="w-24 shrink-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="http">http</SelectItem>
+                              <SelectItem value="https">https</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="localhost"
+                            value={host}
+                            onChange={(e) => setNewRow((r) => r ? { ...r, managementUrl: composeManagementUrl(scheme, e.target.value, mgmtPort) } : r)}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Management Port</Label>
+                        <Input
+                          placeholder="15672"
+                          value={mgmtPort}
+                          onChange={(e) => setNewRow((r) => r ? { ...r, managementUrl: composeManagementUrl(scheme, host, e.target.value) } : r)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">AMQP Port</Label>
+                        <Input
+                          placeholder="5672"
+                          value={newRow.amqpPort}
+                          onChange={(e) => setNewRow((r) => r ? { ...r, amqpPort: e.target.value } : r)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">User</Label>
+                        <Input
+                          placeholder="guest"
+                          value={newRow.user}
+                          onChange={(e) => setNewRow((r) => r ? { ...r, user: e.target.value } : r)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Password</Label>
+                        <Input
+                          type="password"
+                          placeholder="guest"
+                          value={newRow.password}
+                          onChange={(e) => setNewRow((r) => r ? { ...r, password: e.target.value } : r)}
+                        />
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <Label className="text-xs">VHost</Label>
+                        <Input
+                          placeholder="/"
+                          value={newRow.vhost}
+                          onChange={(e) => setNewRow((r) => r ? { ...r, vhost: e.target.value } : r)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
                 {newRow.testState === "error" && newRow.testError && (
                   <p className="text-xs text-destructive">{newRow.testError}</p>
                 )}

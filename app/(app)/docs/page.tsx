@@ -111,7 +111,7 @@ export default function DocsPage() {
         <h2 className="text-lg font-medium">Links</h2>
         <ul className="space-y-1.5 text-sm text-muted-foreground">
           {[
-            { href: "https://github.com/agdirnorge/rask",     label: "GitHub — agdirnorge/rask" },
+            { href: "https://github.com/AgdirAS/rask",     label: "GitHub — AgdirAS/rask" },
             { href: "https://agdir.no",                        label: "Agdir Drift AS — agdir.no" },
             { href: "https://www.rabbitmq.com/docs",           label: "RabbitMQ Documentation" },
           ].map(({ href, label }) => (
