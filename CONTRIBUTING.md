@@ -25,9 +25,9 @@ docker run -d --name rabbitmq \
   -e RABBITMQ_DEFAULT_PASS=guest \
   rabbitmq:4-management
 
-# 4. (Optional) Configure environment
-cp .env.local.example .env.local
-# Edit .env.local if your RabbitMQ runs somewhere other than localhost
+# 4. (Optional) Configure environment overrides
+cp .env.example .env
+# Edit .env if you need STORAGE_ENCRYPTION_KEY or other overrides
 
 # 5. Start the dev server
 pnpm dev

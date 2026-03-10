@@ -2,7 +2,7 @@ FROM node:20-alpine AS base
 
 # ── Stage 1: Install dependencies ──────────────────────────────────────────────
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 RUN corepack enable pnpm
@@ -34,7 +34,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 
 RUN mkdir .next && chown nextjs:nodejs .next
-RUN mkdir .envs && chown nextjs:nodejs .envs
+RUN mkdir data && chown nextjs:nodejs data
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

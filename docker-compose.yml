@@ -25,6 +25,11 @@ services:
       RABBITMQ_USER: guest
       RABBITMQ_PASSWORD: guest
       RABBITMQ_VHOST: /
+    volumes:
+      - rask-data:/app/data
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+volumes:
+  rask-data:

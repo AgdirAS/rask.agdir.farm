@@ -97,12 +97,6 @@ pnpm install
 
 ### 2. Configure connection
 
-Copy the example env file and fill in your RabbitMQ details:
-
-```bash
-cp .env.local.example .env.local
-```
-
 ### 3. Run the dev server
 
 ```bash
@@ -115,18 +109,17 @@ Open [http://localhost:35672](http://localhost:35672).
 
 ## Environment Variables
 
-All variables go in `.env.local`. None are required for the app to start — defaults are used if not set.
+Connection settings are managed through the UI (stored in SQLite). On first run a **Localhost** environment is created automatically.
+
+For advanced use, copy `.env.example` to `.env` and adjust:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RABBITMQ_HOST` | `localhost` | RabbitMQ server hostname or IP |
-| `RABBITMQ_MANAGEMENT_PORT` | `15672` | Management HTTP API port |
-| `RABBITMQ_AMQP_PORT` | `5672` | AMQP protocol port |
-| `RABBITMQ_USER` | `guest` | RabbitMQ username |
-| `RABBITMQ_PASSWORD` | `guest` | RabbitMQ password |
-| `RABBITMQ_VHOST` | `/` | Default virtual host |
-
-You can also set these via the Settings page in the UI (`/settings`) — but **restart the dev server** after saving for changes to take effect.
+| `STORAGE_ENCRYPTION_KEY` | _(unset)_ | Encrypt the SQLite DB at rest (any string) |
 
 ---
 
@@ -154,7 +147,7 @@ app/
     queues/page.tsx       Queue list with live polling
     settings/page.tsx     Connection settings
   api/
-    settings/route.ts     Read/write .env.local
+    settings/route.ts     Read/write connection settings
     rabbitmq/
       queues/route.ts     Proxy → RabbitMQ /api/queues
       overview/route.ts   Proxy → RabbitMQ /api/overview
@@ -169,7 +162,7 @@ components/
 lib/
   types.ts                RabbitMQ entity types
   rabbitmq.ts             Management API client
-  env.ts                  Server-only .env.local helpers
+  env.ts                  SQLite env storage + encryption
   utils.ts                cn() utility
 
 docs/
