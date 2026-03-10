@@ -9,45 +9,53 @@
 
 > Named after Ratatoskr, the Norse messenger squirrel.
 
-A modern Next.js UI for RabbitMQ management. Rask proxies the RabbitMQ Management HTTP API through Next.js API routes — no direct browser-to-RabbitMQ calls.
+A modern web UI for RabbitMQ management. All broker calls are proxied server-side — no direct browser-to-RabbitMQ exposure.
 
 Maintained by [Agdir Drift AS](https://agdir.no).
 
----
-
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript 5 |
-| Styling | TailwindCSS v4 (CSS-based config) |
-| Components | shadcn/ui "new-york" / slate |
-| Data fetching | TanStack Query v5 |
-| AMQP client | amqplib (server-only) |
-| Theme | next-themes |
+<a href="public/screenshots/rask-queue.png"><img src="public/screenshots/rask-queue.png" width="300" /></a>
+<a href="public/screenshots/rask-topology.png"><img src="public/screenshots/rask-topology.png" width="300" /></a>
+<a href="public/screenshots/rask-publish-on-dashbaord.png"><img src="public/screenshots/rask-publish-on-dashbaord.png" width="300" /></a>
+<a href="public/screenshots/rask-env.png"><img src="public/screenshots/rask-env.png" width="300" /></a>
 
 ---
 
 ## Quick Start (Docker)
 
-The easiest way to run Rask — no Node.js required.
+The easiest way to run Rask — no Node.js required. Configure your RabbitMQ connection via the UI after starting.
 
-### Docker
+### Option 1 — RabbitMQ in another container (shared network)
+
+```bash
+docker network create rask-net
+
+# attach your existing RabbitMQ container to the network, or start a new one:
+docker run -d --name rabbitmq --network rask-net rabbitmq:4-management
+
+docker run -d \
+  --name rask \
+  --network rask-net \
+  -p 35672:35672 \
+  -v rask-data:/app/data \
+  ghcr.io/agdiras/rask.agdir.farm:latest
+```
+
+In the UI use `http://rabbitmq:15672` as the management URL.
+
+### Option 2 — RabbitMQ on the host machine
 
 ```bash
 docker run -d \
   --name rask \
+  --add-host host.docker.internal:host-gateway \
   -p 35672:35672 \
-  -e RABBITMQ_HOST=your-rabbitmq-host \
-  -e RABBITMQ_USER=guest \
-  -e RABBITMQ_PASSWORD=guest \
+  -v rask-data:/app/data \
   ghcr.io/agdiras/rask.agdir.farm:latest
 ```
 
-Open [http://localhost:35672](http://localhost:35672).
+In the UI use `http://host.docker.internal:15672` as the management URL. (`--add-host` is only needed on Linux; Docker Desktop on Mac/Windows includes it automatically.)
 
-### Docker Compose
+### Option 3 — Docker Compose (Rask + RabbitMQ together)
 
 ```yaml
 services:
@@ -55,13 +63,8 @@ services:
     image: ghcr.io/agdiras/rask.agdir.farm:latest
     ports:
       - "35672:35672"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_MANAGEMENT_PORT: "15672"
-      RABBITMQ_AMQP_PORT: "5672"
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
+    volumes:
+      - rask-data:/app/data
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -77,6 +80,9 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+volumes:
+  rask-data:
 ```
 
 Save as `compose.yml` and run:
@@ -84,6 +90,8 @@ Save as `compose.yml` and run:
 ```bash
 docker compose up -d
 ```
+
+In the UI use `http://rabbitmq:15672` as the management URL.
 
 ---
 
