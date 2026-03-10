@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import fs from "fs";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import os from "os";
 import path from "path";
 
-// We need to test env.ts functions. Since they rely on process.cwd(), we'll
-// import the functions directly and spy on fs operations.
+// Point each test at a fresh temp directory so tests don't share state
+beforeEach(() => {
+  const tmpDir = path.join(os.tmpdir(), `rask-test-${Date.now()}-${Math.random()}`);
+  vi.stubEnv("RASK_DATA_DIR", tmpDir);
+  vi.resetModules();
+});
 
 describe("validateSlug", () => {
   it("accepts valid slugs", async () => {
@@ -26,60 +29,111 @@ describe("validateSlug", () => {
   });
 });
 
-describe("readEnvFile / writeEnvFile", () => {
-  let tmpDir: string;
-  let envPath: string;
-  let originalCwd: () => string;
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rask-test-"));
-    envPath = path.join(tmpDir, ".env.local");
-    // Override process.cwd to point at tmpDir so env.ts uses our temp file
-    originalCwd = process.cwd.bind(process);
-    process.cwd = () => tmpDir;
+describe("env CRUD", () => {
+  it("seeds a default localhost entry on first run", async () => {
+    const { listEnvs, getActiveSlug } = await import("../env");
+    const envs = listEnvs();
+    expect(envs).toHaveLength(1);
+    expect(envs[0].slug).toBe("localhost");
+    expect(getActiveSlug()).toBe("localhost");
   });
 
-  afterEach(() => {
-    process.cwd = originalCwd;
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    // Reset module cache so next test gets fresh module
-    vi.resetModules();
+  it("creates and retrieves an env", async () => {
+    const { createEnv, listEnvs } = await import("../env");
+    createEnv({
+      slug: "staging",
+      name: "Staging",
+      managementUrl: "http://staging:15672",
+      amqpPort: "5672",
+      user: "admin",
+      password: "secret",
+      vhost: "/",
+    });
+    const envs = listEnvs();
+    const staging = envs.find((e) => e.slug === "staging");
+    expect(staging?.managementUrl).toBe("http://staging:15672");
+    expect(staging?.user).toBe("admin");
   });
 
-  it("returns empty object when file does not exist", async () => {
-    const { readEnvFile } = await import("../env");
-    expect(readEnvFile()).toEqual({});
+  it("updates an env", async () => {
+    const { createEnv, updateEnv, listEnvs } = await import("../env");
+    createEnv({
+      slug: "prod",
+      name: "Production",
+      managementUrl: "http://old:15672",
+      amqpPort: "5672",
+      user: "guest",
+      password: "guest",
+      vhost: "/",
+    });
+    updateEnv("prod", {
+      slug: "prod",
+      name: "Production",
+      managementUrl: "http://new:15672",
+      amqpPort: "5672",
+      user: "guest",
+      password: "guest",
+      vhost: "/",
+    });
+    const envs = listEnvs();
+    expect(envs.find((e) => e.slug === "prod")?.managementUrl).toBe("http://new:15672");
   });
 
-  it("parses key=value pairs, ignoring comments and blanks", async () => {
-    fs.writeFileSync(
-      envPath,
-      `# This is a comment\nRABBITMQ_HOST=localhost\n\nRABBITMQ_USER=guest\n`,
-    );
-    const { readEnvFile } = await import("../env");
-    const result = readEnvFile();
-    expect(result.RABBITMQ_HOST).toBe("localhost");
-    expect(result.RABBITMQ_USER).toBe("guest");
-    expect(Object.keys(result)).not.toContain("# This is a comment");
+  it("deletes an env and clears active slug if it was active", async () => {
+    const { createEnv, activateEnv, deleteEnv, getActiveSlug } = await import("../env");
+    createEnv({
+      slug: "tmp",
+      name: "Tmp",
+      managementUrl: "http://tmp:15672",
+      amqpPort: "5672",
+      user: "guest",
+      password: "guest",
+      vhost: "/",
+    });
+    activateEnv("tmp");
+    expect(getActiveSlug()).toBe("tmp");
+    deleteEnv("tmp");
+    expect(getActiveSlug()).toBeNull();
   });
 
-  it("writeEnvFile creates file with given vars", async () => {
-    const { writeEnvFile, readEnvFile } = await import("../env");
-    writeEnvFile({ RABBITMQ_HOST: "myhost", RABBITMQ_USER: "admin" });
-    const result = readEnvFile();
-    expect(result.RABBITMQ_HOST).toBe("myhost");
-    expect(result.RABBITMQ_USER).toBe("admin");
-  });
-
-  it("writeEnvFile merges with existing values", async () => {
-    fs.writeFileSync(envPath, `RABBITMQ_HOST=oldhost\nRABBITMQ_USER=guest\n`);
-    const { writeEnvFile, readEnvFile } = await import("../env");
-    writeEnvFile({ RABBITMQ_HOST: "newhost" });
-    const result = readEnvFile();
-    expect(result.RABBITMQ_HOST).toBe("newhost");
-    expect(result.RABBITMQ_USER).toBe("guest");
+  it("activateEnv throws if slug does not exist", async () => {
+    const { activateEnv } = await import("../env");
+    expect(() => activateEnv("nonexistent")).toThrow("Env not found");
   });
 });
 
-// Need vi for resetModules
-import { vi } from "vitest";
+describe("getConnectionConfig", () => {
+  it("returns active env values when an env is active", async () => {
+    const { getConnectionConfig, getActiveSlug } = await import("../env");
+    expect(getActiveSlug()).toBe("localhost");
+    const config = getConnectionConfig();
+    expect(config.managementUrl).toContain("15672");
+  });
+
+  it("falls back to process.env when no active slug", async () => {
+    vi.stubEnv("RABBITMQ_MANAGEMENT_URL", "http://envhost:15672");
+    vi.stubEnv("RABBITMQ_USER", "envuser");
+    const { deleteEnv, getConnectionConfig } = await import("../env");
+    deleteEnv("localhost"); // remove seeded entry → no active slug
+    const config = getConnectionConfig();
+    expect(config.managementUrl).toBe("http://envhost:15672");
+    expect(config.user).toBe("envuser");
+  });
+});
+
+describe("readEnvFile / writeEnvFile", () => {
+  it("readEnvFile returns connection vars for active env", async () => {
+    const { readEnvFile } = await import("../env");
+    const result = readEnvFile();
+    expect(result.RABBITMQ_MANAGEMENT_URL).toBeDefined();
+    expect(result.RABBITMQ_USER).toBeDefined();
+  });
+
+  it("writeEnvFile updates the active env", async () => {
+    const { writeEnvFile, readEnvFile } = await import("../env");
+    writeEnvFile({ RABBITMQ_MANAGEMENT_URL: "http://newhost:15672", RABBITMQ_USER: "admin" });
+    const result = readEnvFile();
+    expect(result.RABBITMQ_MANAGEMENT_URL).toBe("http://newhost:15672");
+    expect(result.RABBITMQ_USER).toBe("admin");
+  });
+});

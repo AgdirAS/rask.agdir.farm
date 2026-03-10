@@ -6,7 +6,7 @@ import type { ConnectionConfig, EnvEntry } from "./types";
 
 // ── Storage path ──────────────────────────────────────────────────────────────
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = process.env.RASK_DATA_DIR ?? path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "rask.db");
 
 // ── Encryption (optional) ─────────────────────────────────────────────────────
