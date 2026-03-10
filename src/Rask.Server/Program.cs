@@ -67,3 +67,6 @@ app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 await app.RunAsync();
+
+// Expose for WebApplicationFactory in integration tests
+public partial class Program { }
