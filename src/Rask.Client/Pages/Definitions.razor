@@ -1,0 +1,64 @@
+@page "/definitions"
+@inject RabbitMqService Rmq
+
+<PageTitle>Rask · Definitions</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex gap-3">
+        <button @onclick="ExportAsync" class="btn btn-primary btn-sm">Export Definitions</button>
+        <label class="btn btn-outline btn-sm">
+            Import
+            <InputFile OnChange="ImportAsync" accept=".json" class="hidden" />
+        </label>
+    </div>
+
+    @if (_json is not null)
+    {
+        <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+            <div class="px-4 py-3 border-b border-base-300 flex justify-between items-center">
+                <span class="text-sm font-semibold">Definitions JSON</span>
+                <button @onclick="CopyToClipboard" class="btn btn-ghost btn-xs">Copy</button>
+            </div>
+            <pre class="p-4 text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap">@_json</pre>
+        </div>
+    }
+
+    @if (_importResult is not null)
+    {
+        <div class="alert @(_importResult.StartsWith("Error") ? "alert-error" : "alert-success")">
+            <span class="text-sm">@_importResult</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+    private string? _json;
+    private string? _importResult;
+
+    private async Task ExportAsync()
+    {
+        _json = await Rmq.GetDefinitionsJsonAsync();
+    }
+
+    private async Task ImportAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var reader = new StreamReader(e.File.OpenReadStream(maxAllowedSize: 10_000_000));
+            var json = await reader.ReadToEndAsync();
+            await Rmq.ImportDefinitionsAsync(json);
+            _importResult = "Definitions imported successfully";
+        }
+        catch (Exception ex)
+        {
+            _importResult = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (_json is not null)
+            await Js.InvokeVoidAsync("navigator.clipboard.writeText", _json);
+    }
+}

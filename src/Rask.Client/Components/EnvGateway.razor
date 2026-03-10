@@ -1,0 +1,124 @@
+@inject EnvironmentStateService EnvState
+
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="bg-base-100 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
+            <h2 class="text-lg font-semibold">Environments</h2>
+            <button @onclick="OnClose" class="btn btn-ghost btn-sm btn-square">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+            @foreach (var env in EnvState.Environments)
+            {
+                var isActive = env.Slug == EnvState.ActiveSlug;
+                <div class="@($"border rounded-lg p-4 {(isActive ? "border-primary bg-primary/5" : "border-base-300")}")">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-medium">@env.Name</span>
+                            <span class="text-xs text-base-content/50 ml-2">@env.Slug</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            @if (isActive)
+                            {
+                                <span class="badge badge-primary badge-sm">Active</span>
+                            }
+                            else
+                            {
+                                <button @onclick="() => ActivateAsync(env.Slug)" class="btn btn-outline btn-xs">
+                                    Activate
+                                </button>
+                            }
+                            <button @onclick="() => DeleteAsync(env.Slug)" class="btn btn-ghost btn-xs text-error"
+                                    disabled="@isActive">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-xs text-base-content/60 font-mono">
+                        @env.ManagementUrl · @env.User · vhost: @env.Vhost
+                    </div>
+                </div>
+            }
+
+            @* ── New environment form ── *@
+            <div class="border border-dashed border-base-300 rounded-lg p-4">
+                <h3 class="font-medium text-sm mb-3">Add Environment</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="form-control">
+                        <label class="label py-0"><span class="label-text text-xs">Name</span></label>
+                        <input type="text" @bind="_newName" class="input input-sm input-bordered" placeholder="Production" />
+                    </div>
+                    <div class="form-control">
+                        <label class="label py-0"><span class="label-text text-xs">Slug</span></label>
+                        <input type="text" @bind="_newSlug" class="input input-sm input-bordered" placeholder="production" />
+                    </div>
+                    <div class="form-control col-span-2">
+                        <label class="label py-0"><span class="label-text text-xs">Management URL</span></label>
+                        <input type="text" @bind="_newUrl" class="input input-sm input-bordered" placeholder="http://rabbitmq:15672" />
+                    </div>
+                    <div class="form-control">
+                        <label class="label py-0"><span class="label-text text-xs">User</span></label>
+                        <input type="text" @bind="_newUser" class="input input-sm input-bordered" placeholder="guest" />
+                    </div>
+                    <div class="form-control">
+                        <label class="label py-0"><span class="label-text text-xs">Password</span></label>
+                        <input type="password" @bind="_newPassword" class="input input-sm input-bordered" placeholder="guest" />
+                    </div>
+                    <div class="form-control">
+                        <label class="label py-0"><span class="label-text text-xs">Vhost</span></label>
+                        <input type="text" @bind="_newVhost" class="input input-sm input-bordered" placeholder="/" />
+                    </div>
+                    <div class="form-control">
+                        <label class="label py-0"><span class="label-text text-xs">AMQP Port</span></label>
+                        <input type="text" @bind="_newAmqpPort" class="input input-sm input-bordered" placeholder="5672" />
+                    </div>
+                </div>
+                <div class="flex justify-end mt-3">
+                    <button @onclick="CreateAsync" class="btn btn-primary btn-sm" disabled="@(string.IsNullOrWhiteSpace(_newSlug))">
+                        Add Environment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string _newName = "";
+    private string _newSlug = "";
+    private string _newUrl = "http://localhost:15672";
+    private string _newUser = "guest";
+    private string _newPassword = "guest";
+    private string _newVhost = "/";
+    private string _newAmqpPort = "5672";
+
+    private async Task ActivateAsync(string slug)
+    {
+        await EnvState.ActivateAsync(slug);
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task DeleteAsync(string slug)
+    {
+        await EnvState.DeleteAsync(slug);
+    }
+
+    private async Task CreateAsync()
+    {
+        var entry = new EnvEntry(
+            Slug: _newSlug,
+            Name: _newName,
+            ManagementUrl: _newUrl,
+            AmqpPort: _newAmqpPort,
+            User: _newUser,
+            Password: _newPassword,
+            Vhost: _newVhost
+        );
+        await EnvState.CreateAsync(entry);
+        _newName = _newSlug = "";
+    }
+}

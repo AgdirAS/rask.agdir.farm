@@ -1,0 +1,133 @@
+@page "/exchanges"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Exchanges</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex flex-wrap gap-3 items-center">
+        <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search exchanges…"
+               class="input input-sm input-bordered w-64" />
+        <select @bind="_typeFilter" class="select select-sm select-bordered">
+            <option value="">All types</option>
+            <option value="direct">Direct</option>
+            <option value="fanout">Fanout</option>
+            <option value="topic">Topic</option>
+            <option value="headers">Headers</option>
+        </select>
+    </div>
+
+    @* ── Type summary cards ── *@
+    @if (_exchanges is not null)
+    {
+        var types = _exchanges.GroupBy(e => e.Type).OrderByDescending(g => g.Count());
+        <div class="flex flex-wrap gap-3">
+            @foreach (var g in types)
+            {
+                <div class="badge badge-lg gap-1">@g.Key <span class="font-bold">@g.Count()</span></div>
+            }
+        </div>
+    }
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr class="text-xs uppercase">
+                        <th>Name</th>
+                        <th>Vhost</th>
+                        <th>Type</th>
+                        <th>Durable</th>
+                        <th>Auto-delete</th>
+                        <th>Internal</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_exchanges is null)
+                    {
+                        <tr><td colspan="7" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var ex in Filtered)
+                        {
+                            <tr class="hover cursor-pointer" @onclick="() => _selected = ex">
+                                <td class="font-mono text-sm font-medium">@(string.IsNullOrEmpty(ex.Name) ? "(default)" : ex.Name)</td>
+                                <td><span class="badge badge-ghost badge-sm">@ex.Vhost</span></td>
+                                <td>
+                                    <span class="@($"badge badge-sm {ex.Type switch { "direct" => "badge-primary", "fanout" => "badge-secondary", "topic" => "badge-accent", _ => "badge-ghost" }}")">
+                                        @ex.Type
+                                    </span>
+                                </td>
+                                <td>@(ex.Durable ? "✓" : "—")</td>
+                                <td>@(ex.AutoDelete ? "✓" : "—")</td>
+                                <td>@(ex.Internal ? "✓" : "—")</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(ex.Name) && !ex.Name.StartsWith("amq."))
+                                    {
+                                        <button @onclick="() => DeleteExchangeAsync(ex)" @onclick:stopPropagation
+                                                class="btn btn-ghost btn-xs text-error">Delete</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_selected is not null)
+    {
+        <div class="fixed right-0 top-0 h-full w-[480px] bg-base-100 border-l border-base-300 shadow-xl z-40 overflow-y-auto">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-base-300 sticky top-0 bg-base-100">
+                <h3 class="font-semibold truncate">@(string.IsNullOrEmpty(_selected.Name) ? "(default)" : _selected.Name)</h3>
+                <button @onclick="() => _selected = null" class="btn btn-ghost btn-sm btn-square">✕</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div><span class="text-base-content/50">Type:</span> @_selected.Type</div>
+                    <div><span class="text-base-content/50">Vhost:</span> @_selected.Vhost</div>
+                    <div><span class="text-base-content/50">Durable:</span> @_selected.Durable</div>
+                    <div><span class="text-base-content/50">Internal:</span> @_selected.Internal</div>
+                </div>
+                <div class="border-t border-base-300 pt-4">
+                    <TraceTab Vhost="@_selected.Vhost" />
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<RabbitExchange>? _exchanges;
+    private RabbitExchange? _selected;
+    private string _search = "";
+    private string _typeFilter = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitExchange> Filtered => (_exchanges ?? [])
+        .Where(e => string.IsNullOrEmpty(_search) || e.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .Where(e => string.IsNullOrEmpty(_typeFilter) || e.Type == _typeFilter)
+        .OrderBy(e => e.Name);
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _exchanges = await Rmq.GetExchangesAsync(); }
+            catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task DeleteExchangeAsync(RabbitExchange ex)
+    {
+        await Rmq.DeleteExchangeAsync(ex.Vhost, ex.Name);
+        _exchanges = await Rmq.GetExchangesAsync();
+        if (_selected?.Name == ex.Name) _selected = null;
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

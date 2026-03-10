@@ -1,0 +1,62 @@
+@page "/limits"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Vhost Limits</PageTitle>
+
+<div class="space-y-4">
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase"><th>Vhost</th><th>Max Connections</th><th>Max Queues</th><th></th></tr></thead>
+                <tbody>
+                    @if (_limits is null)
+                    {
+                        <tr><td colspan="4" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else if (_limits.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-center py-4 text-base-content/50">No vhost limits configured</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var l in _limits)
+                        {
+                            <tr class="hover">
+                                <td class="font-mono font-medium">@l.Vhost</td>
+                                <td class="tabular-nums">@(l.Value.MaxConnections?.ToString() ?? "unlimited")</td>
+                                <td class="tabular-nums">@(l.Value.MaxQueues?.ToString() ?? "unlimited")</td>
+                                <td>
+                                    <button @onclick="() => DeleteLimitsAsync(l.Vhost)" class="btn btn-ghost btn-xs text-error">Remove</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<VhostLimit>? _limits;
+    private Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _limits = await Rmq.GetVhostLimitsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task DeleteLimitsAsync(string vhost)
+    {
+        await Rmq.DeleteVhostLimitAsync(vhost, "max-connections");
+        await Rmq.DeleteVhostLimitAsync(vhost, "max-queues");
+        _limits = await Rmq.GetVhostLimitsAsync();
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

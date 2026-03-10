@@ -1,0 +1,63 @@
+@page "/bindings"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Bindings</PageTitle>
+
+<div class="space-y-4">
+    <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search bindings…"
+           class="input input-sm input-bordered w-64" />
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase">
+                    <th>Source</th><th>Destination</th><th>Type</th><th>Routing Key</th><th>Vhost</th>
+                </tr></thead>
+                <tbody>
+                    @if (_bindings is null)
+                    {
+                        <tr><td colspan="5" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var b in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-mono text-sm">@(string.IsNullOrEmpty(b.Source) ? "(default)" : b.Source)</td>
+                                <td class="font-mono text-sm font-medium">@b.Destination</td>
+                                <td><span class="badge badge-ghost badge-sm">@b.DestinationType</span></td>
+                                <td class="font-mono text-xs text-base-content/60">@(string.IsNullOrEmpty(b.RoutingKey) ? "(empty)" : b.RoutingKey)</td>
+                                <td><span class="badge badge-ghost badge-sm">@b.Vhost</span></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RabbitBinding>? _bindings;
+    private string _search = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitBinding> Filtered => (_bindings ?? [])
+        .Where(b => string.IsNullOrEmpty(_search) ||
+            b.Source.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+            b.Destination.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+            b.RoutingKey.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(b => b.Source).ThenBy(b => b.Destination);
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _bindings = await Rmq.GetBindingsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

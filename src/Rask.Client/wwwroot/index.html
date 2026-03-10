@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rask · RabbitMQ Management</title>
+    <base href="/" />
+    <link rel="icon" type="image/png" href="img/rask-logo.png" />
+
+    <!-- Tailwind CSS v4 + DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/daisyui.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <!-- Fonts (matching original) -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+        :root {
+            --font-sans: 'Public Sans', system-ui, sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font-sans);
+        }
+
+        .font-mono {
+            font-family: var(--font-mono);
+        }
+
+        /* Loading spinner */
+        #app-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            gap: 0.75rem;
+        }
+    </style>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen">
+    <div id="app">
+        <div id="app-loading">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <span class="text-base-content/60">Loading Rask…</span>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" style="display:none;" class="alert alert-error fixed bottom-0 w-full z-50">
+        An unhandled error has occurred.
+        <a href="" class="link">Reload</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>

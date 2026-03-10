@@ -1,0 +1,58 @@
+@page "/policies"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Policies</PageTitle>
+
+<div class="space-y-4">
+    <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search policies…" class="input input-sm input-bordered w-64" />
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase"><th>Name</th><th>Vhost</th><th>Pattern</th><th>Apply to</th><th>Priority</th><th></th></tr></thead>
+                <tbody>
+                    @if (_policies is null)
+                    {
+                        <tr><td colspan="6" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-medium">@p.Name</td>
+                                <td><span class="badge badge-ghost badge-sm">@p.Vhost</span></td>
+                                <td class="font-mono text-xs">@p.Pattern</td>
+                                <td><span class="badge badge-sm badge-ghost">@p.ApplyTo</span></td>
+                                <td class="tabular-nums">@p.Priority</td>
+                                <td><button @onclick="() => DeleteAsync(p)" class="btn btn-ghost btn-xs text-error">Delete</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RabbitPolicy>? _policies;
+    private string _search = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitPolicy> Filtered => (_policies ?? [])
+        .Where(p => string.IsNullOrEmpty(_search) || p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _policies = await Rmq.GetPoliciesAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task DeleteAsync(RabbitPolicy p) { await Rmq.DeletePolicyAsync(p.Vhost, p.Name); _policies = await Rmq.GetPoliciesAsync(); }
+    public void Dispose() => _timer?.Dispose();
+}

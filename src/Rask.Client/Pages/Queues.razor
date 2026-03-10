@@ -1,0 +1,194 @@
+@page "/queues"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Queues</PageTitle>
+
+<div class="space-y-4">
+    @* ── Filters ── *@
+    <div class="flex flex-wrap gap-3 items-center">
+        <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search queues…"
+               class="input input-sm input-bordered w-64" />
+        <select @bind="_vhostFilter" class="select select-sm select-bordered">
+            <option value="">All vhosts</option>
+            @foreach (var vh in _vhosts)
+            {
+                <option value="@vh">@vh</option>
+            }
+        </select>
+        <select @bind="_typeFilter" class="select select-sm select-bordered">
+            <option value="">All types</option>
+            <option value="classic">Classic</option>
+            <option value="quorum">Quorum</option>
+            <option value="stream">Stream</option>
+        </select>
+    </div>
+
+    @* ── Table ── *@
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr class="text-xs uppercase">
+                        <th class="cursor-pointer" @onclick='() => Sort("name")'>Name</th>
+                        <th>Vhost</th>
+                        <th>Type</th>
+                        <th>State</th>
+                        <th class="text-right cursor-pointer" @onclick='() => Sort("messages")'>Messages</th>
+                        <th class="text-right">Ready</th>
+                        <th class="text-right">Unacked</th>
+                        <th class="text-right">Consumers</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_queues is null)
+                    {
+                        <tr><td colspan="9" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var q in Filtered)
+                        {
+                            <tr class="hover cursor-pointer" @onclick="() => SelectQueue(q)">
+                                <td class="font-mono text-sm font-medium max-w-xs truncate">@q.Name</td>
+                                <td><span class="badge badge-ghost badge-sm">@q.Vhost</span></td>
+                                <td>
+                                    <span class="@($"badge badge-sm {q.Type switch { "quorum" => "badge-info", "stream" => "badge-warning", _ => "badge-ghost" }}")">
+                                        @q.Type
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="@($"badge badge-sm {q.State switch { "running" => "badge-success", "idle" => "badge-ghost", _ => "badge-error" }}")">
+                                        @q.State
+                                    </span>
+                                </td>
+                                <td class="text-right tabular-nums">@q.Messages.ToString("N0")</td>
+                                <td class="text-right tabular-nums">@q.MessagesReady.ToString("N0")</td>
+                                <td class="text-right tabular-nums">@q.MessagesUnacknowledged.ToString("N0")</td>
+                                <td class="text-right tabular-nums">@q.Consumers</td>
+                                <td>
+                                    <button @onclick="() => DeleteQueueAsync(q)" @onclick:stopPropagation
+                                            class="btn btn-ghost btn-xs text-error">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                        @if (!Filtered.Any())
+                        {
+                            <tr><td colspan="9" class="text-center py-4 text-base-content/50">No queues match your filters</td></tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @* ── Detail drawer ── *@
+    @if (_selected is not null)
+    {
+        <div class="fixed right-0 top-0 h-full w-[480px] bg-base-100 border-l border-base-300 shadow-xl z-40 overflow-y-auto">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-base-300 sticky top-0 bg-base-100 z-10">
+                <h3 class="font-semibold truncate">@_selected.Name</h3>
+                <button @onclick="() => _selected = null" class="btn btn-ghost btn-sm btn-square">✕</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div><span class="text-base-content/50">Vhost:</span> @_selected.Vhost</div>
+                    <div><span class="text-base-content/50">Type:</span> @_selected.Type</div>
+                    <div><span class="text-base-content/50">State:</span> @_selected.State</div>
+                    <div><span class="text-base-content/50">Consumers:</span> @_selected.Consumers</div>
+                    <div><span class="text-base-content/50">Durable:</span> @_selected.Durable</div>
+                    <div><span class="text-base-content/50">Auto-delete:</span> @_selected.AutoDelete</div>
+                    <div><span class="text-base-content/50">Node:</span> <span class="font-mono text-xs">@_selected.Node</span></div>
+                    <div><span class="text-base-content/50">Memory:</span> @(_selected.Memory / 1024)KB</div>
+                </div>
+                <div class="flex gap-2">
+                    <button @onclick="PeekMessagesAsync" class="btn btn-outline btn-sm">Peek Messages</button>
+                    <button @onclick="() => PurgeAsync(_selected)" class="btn btn-warning btn-sm">Purge</button>
+                </div>
+
+                @if (_peekedMessages is not null)
+                {
+                    <div class="space-y-2">
+                        <h4 class="font-semibold text-sm">Messages (@_peekedMessages.Count)</h4>
+                        @foreach (var msg in _peekedMessages)
+                        {
+                            <div class="bg-base-200 rounded p-3 text-xs font-mono">
+                                <div class="text-base-content/50 mb-1">key: @msg.RoutingKey · exchange: @msg.Exchange</div>
+                                <pre class="whitespace-pre-wrap break-all">@msg.Payload</pre>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="border-t border-base-300 pt-4">
+                    <TraceTab Vhost="@_selected.Vhost" />
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<RabbitQueue>? _queues;
+    private RabbitQueue? _selected;
+    private List<QueueMessage>? _peekedMessages;
+    private string _search = "";
+    private string _vhostFilter = "";
+    private string _typeFilter = "";
+    private string _sortKey = "name";
+    private bool _sortAsc = true;
+    private Timer? _timer;
+
+    private IEnumerable<string> _vhosts => (_queues ?? []).Select(q => q.Vhost).Distinct().OrderBy(v => v);
+
+    private IEnumerable<RabbitQueue> Filtered => (_queues ?? [])
+        .Where(q => string.IsNullOrEmpty(_search) || q.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .Where(q => string.IsNullOrEmpty(_vhostFilter) || q.Vhost == _vhostFilter)
+        .Where(q => string.IsNullOrEmpty(_typeFilter) || q.Type == _typeFilter)
+        .OrderBy(q => _sortKey switch
+        {
+            "messages" => _sortAsc ? q.Messages : -q.Messages,
+            _ => 0
+        })
+        .ThenBy(q => _sortKey == "name" ? (_sortAsc ? q.Name : "") : "")
+        .ThenByDescending(q => _sortKey == "name" && !_sortAsc ? q.Name : "");
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _queues = await Rmq.GetQueuesAsync(); }
+            catch { /* ignore */ }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private void Sort(string key)
+    {
+        if (_sortKey == key) _sortAsc = !_sortAsc;
+        else { _sortKey = key; _sortAsc = true; }
+    }
+
+    private void SelectQueue(RabbitQueue q) { _selected = q; _peekedMessages = null; }
+
+    private async Task PeekMessagesAsync()
+    {
+        if (_selected is null) return;
+        _peekedMessages = await Rmq.GetQueueMessagesAsync(_selected.Vhost, _selected.Name);
+    }
+
+    private async Task PurgeAsync(RabbitQueue q)
+    {
+        await Rmq.PurgeQueueAsync(q.Vhost, q.Name);
+    }
+
+    private async Task DeleteQueueAsync(RabbitQueue q)
+    {
+        await Rmq.DeleteQueueAsync(q.Vhost, q.Name);
+        _queues = await Rmq.GetQueuesAsync();
+        if (_selected?.Name == q.Name) _selected = null;
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

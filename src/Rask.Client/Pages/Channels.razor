@@ -1,0 +1,64 @@
+@page "/channels"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Channels</PageTitle>
+
+<div class="space-y-4">
+    <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search channels…"
+           class="input input-sm input-bordered w-64" />
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase">
+                    <th>Name</th><th>Vhost</th><th>User</th><th>State</th><th class="text-right">Consumers</th>
+                    <th class="text-right">Unacked</th><th class="text-right">Prefetch</th><th>Confirm</th>
+                </tr></thead>
+                <tbody>
+                    @if (_channels is null)
+                    {
+                        <tr><td colspan="8" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var ch in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-mono text-xs max-w-xs truncate">@ch.Name</td>
+                                <td><span class="badge badge-ghost badge-sm">@ch.Vhost</span></td>
+                                <td>@ch.User</td>
+                                <td><span class="@($"badge badge-sm {(ch.State == "running" ? "badge-success" : "badge-warning")}")">@ch.State</span></td>
+                                <td class="text-right tabular-nums">@ch.ConsumerCount</td>
+                                <td class="text-right tabular-nums">@ch.MessagesUnacknowledged</td>
+                                <td class="text-right tabular-nums">@ch.PrefetchCount</td>
+                                <td>@(ch.Confirm ? "✓" : "—")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RabbitChannel>? _channels;
+    private string _search = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitChannel> Filtered => (_channels ?? [])
+        .Where(c => string.IsNullOrEmpty(_search) || c.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(c => c.Name);
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _channels = await Rmq.GetChannelsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

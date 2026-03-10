@@ -1,0 +1,72 @@
+@page "/connections"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Connections</PageTitle>
+
+<div class="space-y-4">
+    <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search connections…"
+           class="input input-sm input-bordered w-64" />
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase">
+                    <th>Name</th><th>User</th><th>Vhost</th><th>State</th><th>Channels</th><th>Peer</th><th>Protocol</th><th>SSL</th><th></th>
+                </tr></thead>
+                <tbody>
+                    @if (_connections is null)
+                    {
+                        <tr><td colspan="9" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var c in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-mono text-xs max-w-xs truncate">@c.Name</td>
+                                <td>@c.User</td>
+                                <td><span class="badge badge-ghost badge-sm">@c.Vhost</span></td>
+                                <td><span class="@($"badge badge-sm {(c.State == "running" ? "badge-success" : "badge-warning")}")">@c.State</span></td>
+                                <td class="text-right tabular-nums">@c.Channels</td>
+                                <td class="font-mono text-xs">@c.PeerHost:@c.PeerPort</td>
+                                <td class="text-xs">@c.Protocol</td>
+                                <td>@(c.Ssl ? "✓" : "—")</td>
+                                <td>
+                                    <button @onclick="() => CloseAsync(c.Name)" class="btn btn-ghost btn-xs text-error">Close</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RabbitConnection>? _connections;
+    private string _search = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitConnection> Filtered => (_connections ?? [])
+        .Where(c => string.IsNullOrEmpty(_search) || c.Name.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(c => c.Name);
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _connections = await Rmq.GetConnectionsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task CloseAsync(string name)
+    {
+        await Rmq.CloseConnectionAsync(name);
+        _connections = await Rmq.GetConnectionsAsync();
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

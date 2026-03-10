@@ -1,0 +1,59 @@
+@inject NavigationManager Nav
+@implements IDisposable
+
+<div class="shrink-0 border-b border-base-300 bg-base-200">
+    <header class="flex h-14 items-center px-6 gap-4">
+        <h1 class="text-base font-semibold truncate">@_title</h1>
+        <div class="flex-1"></div>
+        <span class="text-xs font-mono text-base-content/40">
+            @DateTime.Now.ToString("HH:mm:ss")
+        </span>
+    </header>
+</div>
+
+@code {
+    private string _title = "Dashboard";
+
+    private static readonly Dictionary<string, string> TitleMap = new()
+    {
+        ["/"] = "Dashboard",
+        ["/connections"] = "Connections",
+        ["/channels"] = "Channels",
+        ["/queues"] = "Queues",
+        ["/exchanges"] = "Exchanges",
+        ["/topology"] = "Topology",
+        ["/bindings"] = "Bindings",
+        ["/policies"] = "Policies",
+        ["/users"] = "Users",
+        ["/permissions"] = "Permissions",
+        ["/vhosts"] = "Virtual Hosts",
+        ["/limits"] = "Vhost Limits",
+        ["/parameters"] = "Parameters",
+        ["/feature-flags"] = "Feature Flags",
+        ["/definitions"] = "Definitions",
+        ["/docs"] = "About",
+        ["/privacy"] = "Privacy",
+        ["/terms"] = "Terms",
+    };
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        UpdateTitle();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        UpdateTitle();
+        StateHasChanged();
+    }
+
+    private void UpdateTitle()
+    {
+        var path = "/" + Nav.ToBaseRelativePath(Nav.Uri);
+        if (path.Contains('?')) path = path[..path.IndexOf('?')];
+        _title = TitleMap.GetValueOrDefault(path, path.Trim('/').Replace("/", " / "));
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

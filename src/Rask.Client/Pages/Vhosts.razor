@@ -1,0 +1,90 @@
+@page "/vhosts"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Virtual Hosts</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex gap-3 items-center">
+        <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search vhosts…" class="input input-sm input-bordered w-64" />
+        <button @onclick="() => _showCreate = true" class="btn btn-primary btn-sm">Create Vhost</button>
+    </div>
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase">
+                    <th>Name</th><th>Tracing</th><th>Messages</th><th>Description</th><th></th>
+                </tr></thead>
+                <tbody>
+                    @if (_vhosts is null)
+                    {
+                        <tr><td colspan="5" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var vh in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-mono font-medium">@vh.Name</td>
+                                <td>
+                                    <input type="checkbox" checked="@vh.Tracing" @onchange="() => ToggleTracing(vh)"
+                                           class="toggle toggle-sm toggle-primary" />
+                                </td>
+                                <td class="tabular-nums">@(vh.Messages?.ToString("N0") ?? "—")</td>
+                                <td class="text-base-content/60 text-sm max-w-xs truncate">@(vh.Description ?? "")</td>
+                                <td>
+                                    @if (vh.Name != "/")
+                                    {
+                                        <button @onclick="() => DeleteVhostAsync(vh.Name)" class="btn btn-ghost btn-xs text-error">Delete</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_showCreate)
+    {
+        <div class="bg-base-100 border border-base-300 rounded-lg p-6 space-y-3">
+            <h3 class="font-semibold">Create Virtual Host</h3>
+            <div class="form-control">
+                <label class="label"><span class="label-text text-xs">Name</span></label>
+                <input type="text" @bind="_newName" class="input input-sm input-bordered w-64" />
+            </div>
+            <div class="flex gap-2">
+                <button @onclick="CreateVhostAsync" class="btn btn-primary btn-sm" disabled="@string.IsNullOrWhiteSpace(_newName)">Create</button>
+                <button @onclick="() => _showCreate = false" class="btn btn-ghost btn-sm">Cancel</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<RabbitVhost>? _vhosts;
+    private string _search = "";
+    private bool _showCreate;
+    private string _newName = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitVhost> Filtered => (_vhosts ?? [])
+        .Where(v => string.IsNullOrEmpty(_search) || v.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _vhosts = await Rmq.GetVhostsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task ToggleTracing(RabbitVhost vh) => await Rmq.SetVhostTracingAsync(vh.Name, !vh.Tracing);
+    private async Task DeleteVhostAsync(string name) { await Rmq.DeleteVhostAsync(name); _vhosts = await Rmq.GetVhostsAsync(); }
+    private async Task CreateVhostAsync() { await Rmq.CreateVhostAsync(_newName, new CreateVhostRequest()); _showCreate = false; _newName = ""; _vhosts = await Rmq.GetVhostsAsync(); }
+
+    public void Dispose() => _timer?.Dispose();
+}

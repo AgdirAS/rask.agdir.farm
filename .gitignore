@@ -43,3 +43,14 @@ data/
 *.tsbuildinfo
 next-env.d.ts
 .worktrees/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+.vs/
+*.DotSettings.user
+TestResults/
+publish/

@@ -1,0 +1,72 @@
+@page "/feature-flags"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Feature Flags</PageTitle>
+
+<div class="space-y-6">
+    @if (_flags is null)
+    {
+        <div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>
+    }
+    else
+    {
+        @foreach (var (group, label, badgeCls) in new[] {
+            ("enabled", "Enabled", "badge-success"),
+            ("disabled", "Disabled", "badge-warning"),
+            ("unavailable", "Unavailable", "badge-ghost") })
+        {
+            var items = _flags.Where(f => f.State == group).ToList();
+            if (items.Count == 0) continue;
+
+            <div>
+                <h3 class="font-semibold text-sm mb-2 flex items-center gap-2">
+                    @label <span class="badge @badgeCls badge-sm">@items.Count</span>
+                </h3>
+                <div class="bg-base-100 border border-base-300 rounded-lg divide-y divide-base-300">
+                    @foreach (var f in items)
+                    {
+                        <div class="px-4 py-3 flex items-start gap-4">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-mono text-sm font-medium">@f.Name</div>
+                                <div class="text-xs text-base-content/60 mt-0.5">@f.Desc</div>
+                                <div class="text-[10px] text-base-content/40 mt-1">
+                                    Provided by: @f.ProvidedBy · Stability: @f.Stability
+                                    @if (f.DependsOn.Count > 0)
+                                    {
+                                        <span> · Depends on: @string.Join(", ", f.DependsOn)</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (f.State == "disabled")
+                            {
+                                <button @onclick="() => EnableAsync(f.Name)" class="btn btn-primary btn-xs">Enable</button>
+                            }
+                            else
+                            {
+                                <span class="badge @badgeCls badge-sm">@f.State</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<FeatureFlag>? _flags;
+    private Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _flags = await Rmq.GetFeatureFlagsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+    }
+
+    private async Task EnableAsync(string name) { await Rmq.EnableFeatureFlagAsync(name); _flags = await Rmq.GetFeatureFlagsAsync(); }
+    public void Dispose() => _timer?.Dispose();
+}
