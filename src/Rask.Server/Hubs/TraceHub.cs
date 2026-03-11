@@ -160,7 +160,7 @@ public sealed class TraceHub : Hub
             }
         };
 
-        await channel.BasicConsumeAsync(queueName, autoAck: true, consumer: consumer, cancellationToken: ct);
+        await channel.BasicConsumeAsync(queueName, autoAck: true, consumerTag: "", noLocal: false, exclusive: false, arguments: null, consumer: consumer, cancellationToken: ct);
 
         // Keep alive until cancelled
         try
