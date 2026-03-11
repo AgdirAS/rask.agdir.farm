@@ -35,10 +35,8 @@
                           stroke="currentColor" stroke-opacity="0.2" stroke-width="1.5" />
                     @if (!string.IsNullOrEmpty(edge.Label))
                     {
-                        <text x="@((edge.X1 + edge.X2) / 2)" y="@((edge.Y1 + edge.Y2) / 2 - 4)"
-                              font-size="9" fill="currentColor" fill-opacity="0.4" text-anchor="middle">
-                            @edge.Label
-                        </text>
+                        @SvgText((edge.X1 + edge.X2) / 2, (edge.Y1 + edge.Y2) / 2 - 4, edge.Label,
+                            fontSize: 9, fillOpacity: "0.4")
                     }
                 }
 
@@ -48,10 +46,8 @@
                     <g>
                         <rect x="@node.X" y="@node.Y" width="140" height="32" rx="6"
                               fill="oklch(0.7 0.15 280)" fill-opacity="0.15" stroke="oklch(0.7 0.15 280)" stroke-width="1" />
-                        <text x="@(node.X + 70)" y="@(node.Y + 20)" font-size="11" fill="currentColor"
-                              text-anchor="middle" font-family="monospace">
-                            @TruncateName(node.Name, 18)
-                        </text>
+                        @SvgText(node.X + 70, node.Y + 20, TruncateName(node.Name, 18),
+                            fontSize: 11, fontFamily: "monospace")
                     </g>
                 }
 
@@ -63,14 +59,10 @@
                         <rect x="@node.X" y="@node.Y" width="140" height="32" rx="6"
                               fill="@(isWarning ? "oklch(0.7 0.15 25)" : "oklch(0.7 0.15 220)")" fill-opacity="0.15"
                               stroke="@(isWarning ? "oklch(0.7 0.15 25)" : "oklch(0.7 0.15 220)")" stroke-width="1" />
-                        <text x="@(node.X + 70)" y="@(node.Y + 14)" font-size="11" fill="currentColor"
-                              text-anchor="middle" font-family="monospace">
-                            @TruncateName(node.Name, 18)
-                        </text>
-                        <text x="@(node.X + 70)" y="@(node.Y + 26)" font-size="9" fill="currentColor" fill-opacity="0.5"
-                              text-anchor="middle">
-                            @node.Messages msg · @node.Consumers cons
-                        </text>
+                        @SvgText(node.X + 70, node.Y + 14, TruncateName(node.Name, 18),
+                            fontSize: 11, fontFamily: "monospace")
+                        @SvgText(node.X + 70, node.Y + 26, $"{node.Messages} msg · {node.Consumers} cons",
+                            fontSize: 9, fillOpacity: "0.5")
                     </g>
                 }
             </svg>
@@ -171,7 +163,16 @@
     }
 
     private static string TruncateName(string name, int maxLen) =>
-        name.Length <= maxLen ? name : name[..(maxLen - 1)] + "…";
+        name.Length <= maxLen ? name : name[..(maxLen - 1)] + "\u2026";
+
+    private static MarkupString SvgText(int x, int y, string content,
+        int fontSize = 11, string fillOpacity = "1", string fontFamily = "")
+    {
+        var ff = string.IsNullOrEmpty(fontFamily) ? "" : $@" font-family=""{fontFamily}""";
+        var fo = fillOpacity == "1" ? "" : $@" fill-opacity=""{fillOpacity}""";
+        return new MarkupString(
+            $@"<text x=""{x}"" y=""{y}"" font-size=""{fontSize}"" fill=""currentColor""{fo}{ff} text-anchor=""middle"">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+    }
 
     public void Dispose() => _timer?.Dispose();
 }
