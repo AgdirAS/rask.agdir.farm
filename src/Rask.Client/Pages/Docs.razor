@@ -1,0 +1,37 @@
+@page "/docs"
+
+<PageTitle>Rask · About</PageTitle>
+
+<div class="max-w-3xl space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold mb-2">About Rask</h1>
+        <p class="text-base-content/70 leading-relaxed">
+            Rask is an open-source RabbitMQ management dashboard built by
+            <a href="https://agdir.no" class="link link-primary" target="_blank" rel="noopener noreferrer">Agdir Drift AS</a>.
+            Named after <strong>Ratatoskr</strong>, the Norse messenger squirrel that carries messages between
+            the eagle at the top of Yggdrasil and the serpent at its roots.
+        </p>
+    </div>
+
+    <div>
+        <h2 class="text-lg font-semibold mb-2">Features</h2>
+        <ul class="list-disc list-inside space-y-1 text-base-content/70">
+            <li>Real-time overview with message rate charts and node status</li>
+            <li>Queue management: peek, publish, purge, delete</li>
+            <li>Exchange routing and topology visualization</li>
+            <li>Live message tracing via AMQP</li>
+            <li>Multi-environment support with encrypted credential storage</li>
+            <li>Full admin: users, permissions, policies, vhosts, limits</li>
+            <li>Import/export broker definitions</li>
+            <li>Dark and light theme support</li>
+        </ul>
+    </div>
+
+    <div>
+        <h2 class="text-lg font-semibold mb-2">Technology</h2>
+        <p class="text-base-content/70">
+            Built with .NET 9, Blazor WebAssembly, ASP.NET Core, Tailwind CSS, and DaisyUI.
+            Server-side proxying ensures your RabbitMQ credentials never leave the server.
+        </p>
+    </div>
+</div>

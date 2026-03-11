@@ -1,0 +1,257 @@
+@page "/"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Dashboard</PageTitle>
+
+<div class="space-y-6">
+    @* ── Stat cards ── *@
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <StatCard Label="Connections" Value="@(_overview?.ObjectTotals.Connections.ToString() ?? "—")" Href="/connections" />
+        <StatCard Label="Channels" Value="@(_overview?.ObjectTotals.Channels.ToString() ?? "—")" Href="/channels" />
+        <StatCard Label="Exchanges" Value="@(_overview?.ObjectTotals.Exchanges.ToString() ?? "—")" Href="/exchanges" />
+        <StatCard Label="Queues" Value="@(_overview?.ObjectTotals.Queues.ToString() ?? "—")" Href="/queues" />
+        <StatCard Label="Consumers" Value="@(_overview?.ObjectTotals.Consumers.ToString() ?? "—")" Href="/connections" />
+    </div>
+
+    @* ── Charts row ── *@
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        @* Message rates *@
+        <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm p-6">
+            <div class="flex justify-between items-center mb-1">
+                <h3 class="font-semibold">Message Rates</h3>
+                <div class="flex gap-3 text-xs">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-primary inline-block"></span>
+                        Publish
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-warning inline-block"></span>
+                        Ack
+                    </span>
+                </div>
+            </div>
+            <p class="text-sm text-base-content/60 mb-3">
+                @if (_overview?.MessageStats?.PublishDetails is not null)
+                {
+                    @($"{_overview.MessageStats.PublishDetails.Rate:F1}/s publish · {(_overview.MessageStats.AckDetails?.Rate ?? 0):F1}/s ack")
+                }
+                else
+                {
+                    <span>Waiting for data…</span>
+                }
+            </p>
+            <div class="h-40 border-l border-b border-base-300 relative flex items-end gap-px px-1">
+                @foreach (var rate in _publishRates.TakeLast(60))
+                {
+                    var h = _maxRate > 0 ? (rate / _maxRate * 100) : 0;
+                    <div class="flex-1 bg-primary/60 rounded-t transition-all" style="height: @($"{h:F0}")%"></div>
+                }
+                @if (_publishRates.Count < 2)
+                {
+                    <p class="absolute inset-0 flex items-center justify-center text-xs text-base-content/50">Collecting data…</p>
+                }
+            </div>
+        </div>
+
+        @* Queue depth *@
+        <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm p-6">
+            <div class="flex justify-between items-center mb-1">
+                <h3 class="font-semibold">Queue Depth</h3>
+                <span class="text-xs text-base-content/50">Top 5 by message count</span>
+            </div>
+            <p class="text-sm text-base-content/60 mb-3">
+                @((_overview?.QueueTotals?.Messages ?? 0).ToString("N0")) total messages
+            </p>
+            @if (_topQueues.Count == 0)
+            {
+                <div class="h-40 flex items-center justify-center">
+                    <p class="text-sm text-base-content/50">No queues with messages</p>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-2.5">
+                    @{ var maxMsg = _topQueues[0].Messages > 0 ? _topQueues[0].Messages : 1; }
+                    @for (var i = 0; i < _topQueues.Count; i++)
+                    {
+                        var q = _topQueues[i];
+                        var pct = (double)q.Messages / maxMsg * 100;
+                        var colors = new[] { "bg-primary", "bg-secondary", "bg-warning", "bg-success", "bg-info" };
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-mono truncate max-w-[200px]" title="@q.Name">@q.Name</span>
+                                <span class="text-base-content/50 ml-2">@q.Messages.ToString("N0")</span>
+                            </div>
+                            <div class="h-1.5 bg-base-300 rounded-full overflow-hidden">
+                                <div class="@($"h-full rounded-full {colors[i % colors.Length]}")" style="width: @($"{pct:F0}")%"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Nodes table ── *@
+    <div class="bg-base-100 border border-base-300 rounded-lg shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-base-300 flex justify-between items-center">
+            <h3 class="font-semibold">Nodes Status</h3>
+            @if (_nodes is not null && _nodes.All(n => n.Running))
+            {
+                <span class="badge badge-success badge-sm">All nodes healthy</span>
+            }
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr class="text-xs uppercase">
+                        <th>Node Name</th>
+                        <th>File Descriptors</th>
+                        <th>Sockets</th>
+                        <th>Erlang Processes</th>
+                        <th>Memory</th>
+                        <th>Disk Free</th>
+                        <th class="text-right">Uptime</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_nodes is null)
+                    {
+                        <tr><td colspan="7" class="text-center text-base-content/50">Loading…</td></tr>
+                    }
+                    else if (_nodes.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-center text-base-content/50">No nodes found</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var node in _nodes)
+                        {
+                            <tr class="hover">
+                                <td class="font-medium flex items-center gap-2">
+                                    <span class="@($"w-2 h-2 rounded-full {(node.Running ? "bg-success" : "bg-error")}")"></span>
+                                    @node.Name
+                                </td>
+                                <td><ProgressBar Used="node.FdUsed" Total="node.FdTotal" /></td>
+                                <td><ProgressBar Used="node.SocketsUsed" Total="node.SocketsTotal" /></td>
+                                <td class="text-base-content/60">@FmtNum(node.ProcUsed)/@FmtNum(node.ProcTotal)</td>
+                                <td>
+                                    <span class="bg-base-200 px-1.5 py-0.5 rounded text-xs font-medium">@FmtBytes(node.MemUsed)</span>
+                                    <span class="text-xs text-base-content/50 ml-1">@FmtBytes(node.MemLimit) limit</span>
+                                </td>
+                                <td class="font-semibold text-success">@FmtBytes(node.DiskFree) free</td>
+                                <td class="text-right text-base-content/60">@FmtUptime(node.Uptime)</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @* ── Bottom row ── *@
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-base-100 border border-base-300 rounded-lg p-5">
+            <h4 class="text-sm font-semibold mb-4">Listening Ports</h4>
+            <div class="space-y-2.5">
+                @if (_overview?.Listeners is not null)
+                {
+                    @foreach (var l in _overview.Listeners)
+                    {
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-base-content/60 capitalize">@System.Text.RegularExpressions.Regex.Replace(l.Protocol, @"-[0-9]+$", "")</span>
+                            <span class="font-mono bg-base-200 px-1.5 py-0.5 rounded text-xs">@l.Port</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="bg-base-100 border border-base-300 rounded-lg p-5">
+            <h4 class="text-sm font-semibold mb-4">System Status</h4>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-[10px] text-base-content/50 uppercase tracking-wide">Erlang Version</p>
+                    <p class="text-sm font-medium">@(_overview?.ErlangVersion ?? "—")</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-base-content/50 uppercase tracking-wide">RabbitMQ Version</p>
+                    <p class="text-sm font-medium">@(_overview?.RabbitmqVersion ?? "—")</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-base-content/50 uppercase tracking-wide">Cluster</p>
+                    <p class="text-sm font-medium truncate">@(_overview?.ClusterName ?? "—")</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-base-content/50 uppercase tracking-wide">Node</p>
+                    <p class="text-sm font-medium truncate">@(_overview?.Node ?? "—")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Overview? _overview;
+    private List<NodeStats>? _nodes;
+    private List<RabbitQueue> _topQueues = [];
+    private readonly List<double> _publishRates = [];
+    private double _maxRate;
+    private Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try
+            {
+                _overview = await Rmq.GetOverviewAsync();
+                _nodes = await Rmq.GetNodesAsync();
+                var queues = await Rmq.GetQueuesAsync();
+
+                _topQueues = (queues ?? [])
+                    .Where(q => q.Messages > 0)
+                    .OrderByDescending(q => q.Messages)
+                    .Take(5)
+                    .ToList();
+
+                var rate = _overview?.MessageStats?.PublishDetails?.Rate ?? 0;
+                _publishRates.Add(rate);
+                if (_publishRates.Count > 60) _publishRates.RemoveAt(0);
+                _maxRate = _publishRates.Count > 0 ? _publishRates.Max() : 0.01;
+                if (_maxRate < 0.01) _maxRate = 0.01;
+            }
+            catch { /* ignore polling errors */ }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private static string FmtBytes(long bytes) => bytes switch
+    {
+        >= 1_073_741_824 => $"{bytes / 1_073_741_824.0:F1} GiB",
+        >= 1_048_576 => $"{bytes / 1_048_576.0:F0} MiB",
+        >= 1_024 => $"{bytes / 1_024.0:F0} KiB",
+        _ => $"{bytes} B"
+    };
+
+    private static string FmtNum(long n) => n switch
+    {
+        >= 1_000_000 => $"{n / 1_000_000.0:F1}M",
+        >= 1_000 => $"{n / 1_000.0:F1}k",
+        _ => n.ToString()
+    };
+
+    private static string FmtUptime(long ms)
+    {
+        var s = ms / 1000;
+        var d = s / 86400;
+        var h = (s % 86400) / 3600;
+        var m = (s % 3600) / 60;
+        if (d > 0) return $"{d}d {h}h";
+        if (h > 0) return $"{h}h {m}m";
+        return $"{m}m";
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

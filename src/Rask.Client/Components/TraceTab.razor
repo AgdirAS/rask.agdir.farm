@@ -1,0 +1,115 @@
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
+
+<div class="space-y-2 max-h-96 overflow-y-auto" id="trace-container">
+    @if (!_tracing)
+    {
+        <button @onclick="StartTracing" class="btn btn-outline btn-sm gap-2">
+            <span class="loading loading-spinner loading-xs" style="display: @(_connecting ? "inline-flex" : "none")"></span>
+            Start Trace
+        </button>
+    }
+    else
+    {
+        <div class="flex items-center gap-2 mb-2">
+            <span class="badge badge-success badge-sm gap-1">
+                <span class="loading loading-dots loading-xs"></span>
+                Tracing
+            </span>
+            <button @onclick="StopTracing" class="btn btn-ghost btn-xs">Stop</button>
+            <span class="text-xs text-base-content/50">@_events.Count events</span>
+        </div>
+    }
+
+    @foreach (var ev in _events)
+    {
+        var borderColor = ev.Type switch
+        {
+            "publish" => "border-l-primary",
+            "deliver" => "border-l-success",
+            _ => "border-l-warning"
+        };
+        <div class="@($"border-l-4 {borderColor} bg-base-200 rounded-r px-3 py-2 text-xs")">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="badge badge-xs @(ev.Type == "publish" ? "badge-primary" : ev.Type == "deliver" ? "badge-success" : "badge-warning")">
+                    @ev.Type
+                </span>
+                <span class="font-mono text-base-content/50">@DateTimeOffset.FromUnixTimeMilliseconds(ev.Timestamp).ToString("HH:mm:ss.fff")</span>
+            </div>
+            <div class="font-mono truncate">
+                <span class="text-base-content/50">exchange:</span> @ev.Exchange
+                @if (ev.Queue is not null)
+                {
+                    <span class="ml-2 text-base-content/50">queue:</span> @ev.Queue
+                }
+            </div>
+            <div class="font-mono truncate text-base-content/60">
+                <span class="text-base-content/50">key:</span> @ev.RoutingKey
+            </div>
+            @if (!string.IsNullOrEmpty(ev.Payload))
+            {
+                <div class="font-mono mt-1 text-base-content/70 truncate max-w-sm">@ev.Payload</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Vhost { get; set; } = "/";
+
+    private HubConnection? _hub;
+    private bool _tracing;
+    private bool _connecting;
+    private readonly List<TraceEvent> _events = [];
+
+    private async Task StartTracing()
+    {
+        _connecting = true;
+        try
+        {
+            _hub = new HubConnectionBuilder()
+                .WithUrl(Nav.ToAbsoluteUri("/hubs/trace"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hub.On<TraceEvent>("ReceiveTraceEvent", (ev) =>
+            {
+                _events.Add(ev);
+                if (_events.Count > 200) _events.RemoveAt(0);
+                InvokeAsync(StateHasChanged);
+            });
+
+            await _hub.StartAsync();
+            await _hub.InvokeAsync("StartTrace", Vhost);
+            _tracing = true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Trace error: {ex.Message}");
+        }
+        finally
+        {
+            _connecting = false;
+        }
+    }
+
+    private async Task StopTracing()
+    {
+        if (_hub is not null)
+        {
+            await _hub.InvokeAsync("StopTrace");
+            await _hub.DisposeAsync();
+            _hub = null;
+        }
+        _tracing = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+        {
+            await _hub.DisposeAsync();
+        }
+    }
+}

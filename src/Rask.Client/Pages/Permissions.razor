@@ -1,0 +1,58 @@
+@page "/permissions"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Permissions</PageTitle>
+
+<div class="space-y-4">
+    <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search permissions…" class="input input-sm input-bordered w-64" />
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase"><th>User</th><th>Vhost</th><th>Configure</th><th>Write</th><th>Read</th><th></th></tr></thead>
+                <tbody>
+                    @if (_perms is null)
+                    {
+                        <tr><td colspan="6" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-medium">@p.User</td>
+                                <td><span class="badge badge-ghost badge-sm">@p.Vhost</span></td>
+                                <td class="font-mono text-xs">@p.Configure</td>
+                                <td class="font-mono text-xs">@p.Write</td>
+                                <td class="font-mono text-xs">@p.Read</td>
+                                <td><button @onclick="() => DeleteAsync(p)" class="btn btn-ghost btn-xs text-error">Delete</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<VhostPermission>? _perms;
+    private string _search = "";
+    private Timer? _timer;
+
+    private IEnumerable<VhostPermission> Filtered => (_perms ?? [])
+        .Where(p => string.IsNullOrEmpty(_search) || p.User.Contains(_search, StringComparison.OrdinalIgnoreCase) || p.Vhost.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _perms = await Rmq.GetPermissionsAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task DeleteAsync(VhostPermission p) { await Rmq.DeletePermissionAsync(p.Vhost, p.User); _perms = await Rmq.GetPermissionsAsync(); }
+    public void Dispose() => _timer?.Dispose();
+}

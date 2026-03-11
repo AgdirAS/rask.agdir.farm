@@ -1,0 +1,16 @@
+@{
+    var p = Total > 0 ? (int)Math.Round((double)Used / Total * 100) : 0;
+    var color = p > 80 ? "bg-error" : p > 50 ? "bg-warning" : "bg-success";
+}
+
+<div class="flex flex-col gap-1">
+    <div class="w-full bg-base-300 h-1.5 rounded-full">
+        <div class="@($"{color} h-1.5 rounded-full")" style="width: @p%"></div>
+    </div>
+    <span class="text-xs text-base-content/50">@Used.ToString("N0") of @Total.ToString("N0")</span>
+</div>
+
+@code {
+    [Parameter] public int Used { get; set; }
+    [Parameter] public int Total { get; set; }
+}

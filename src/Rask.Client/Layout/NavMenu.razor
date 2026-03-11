@@ -1,0 +1,150 @@
+@inject NavigationManager Nav
+@inject ThemeService Theme
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<aside class="flex h-full w-60 flex-col border-r border-base-300 bg-base-200">
+    @* ── Logo ── *@
+    <div class="flex h-14 items-center border-b border-base-300 px-4">
+        <span class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <img src="img/rask-logo.png" alt="Rask" class="h-10 w-10 object-contain" />
+            <span class="leading-tight">
+                Rask
+                <sub class="text-[10px] font-normal text-base-content/50 block leading-none">RabbitMQ client</sub>
+            </span>
+        </span>
+    </div>
+
+    @* ── Server panel ── *@
+    <div class="border-b border-base-300 px-3 py-2 space-y-1">
+        <button @onclick="OnSwitchEnv"
+                class="flex w-full items-center gap-2 rounded-md px-1 py-1 text-sm transition-colors hover:bg-base-300 group">
+            <span class="@($"h-2 w-2 rounded-full shrink-0 {(_connected ? "bg-success" : "bg-error")}")" />
+            <span class="flex-1 text-left font-medium truncate text-xs">
+                @(_overview?.ClusterName ?? "—")
+            </span>
+            <svg class="h-3 w-3 text-base-content/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+        @if (_overview is not null)
+        {
+            <div class="px-1 text-[10px] text-base-content/50 leading-relaxed">
+                <div>RabbitMQ @_overview.RabbitmqVersion · Erlang @_overview.ErlangVersion</div>
+                <div class="truncate">@_overview.Node</div>
+            </div>
+        }
+        else if (!_connected)
+        {
+            <div class="px-1 text-[10px] text-error">Unreachable</div>
+        }
+    </div>
+
+    @* ── Quick actions ── *@
+    <div class="flex items-center justify-center gap-0.5 border-b border-base-300 px-3 py-1.5">
+        <button title="Toggle theme" @onclick="Theme.Toggle"
+                class="btn btn-ghost btn-xs btn-square">
+            @if (Theme.IsDarkMode)
+            {
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="5" /><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>
+            }
+            else
+            {
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+            }
+        </button>
+        <button title="Publish message" @onclick="OnOpenPublish"
+                class="btn btn-ghost btn-xs btn-square">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
+        </button>
+        <div class="dropdown dropdown-end">
+            <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" title="Admin">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
+            </div>
+            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-48 p-2 shadow-lg border border-base-300">
+                @foreach (var item in AdminItems)
+                {
+                    <li><NavLink href="@item.Href" class="text-sm">@item.Label</NavLink></li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    @* ── Navigation ── *@
+    <nav class="flex flex-1 flex-col gap-1 p-2 overflow-y-auto">
+        @foreach (var item in NavItems)
+        {
+            var isActive = item.Href == "/"
+                ? ("/" + Nav.ToBaseRelativePath(Nav.Uri)) == "/"
+                : ("/" + Nav.ToBaseRelativePath(Nav.Uri)).StartsWith(item.Href);
+            <NavLink href="@item.Href"
+                     class="@($"flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors {(isActive ? "bg-primary text-primary-content" : "hover:bg-base-300")}")"
+                     Match="@(item.Href == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)">
+                @item.Label
+            </NavLink>
+        }
+    </nav>
+
+    @* ── Footer ── *@
+    <div class="border-t border-base-300 px-3 py-2 text-[10px] text-base-content/50 space-y-1.5">
+        <div>© 2026 Agdir Drift AS</div>
+        <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <a href="/docs" class="hover:text-base-content transition-colors">About</a>
+            <a href="/privacy" class="hover:text-base-content transition-colors">Privacy</a>
+            <a href="/terms" class="hover:text-base-content transition-colors">Terms</a>
+        </div>
+    </div>
+</aside>
+
+@code {
+    [Parameter] public EventCallback OnOpenPublish { get; set; }
+    [Parameter] public EventCallback OnSwitchEnv { get; set; }
+
+    private Overview? _overview;
+    private bool _connected;
+    private Timer? _timer;
+
+    private record NavItem(string Href, string Label);
+
+    private static readonly NavItem[] NavItems =
+    [
+        new("/",            "Dashboard"),
+        new("/connections", "Connections"),
+        new("/channels",    "Channels"),
+        new("/queues",      "Queues"),
+        new("/exchanges",   "Exchanges"),
+        new("/topology",    "Topology"),
+        new("/policies",    "Policies"),
+        new("/bindings",    "Bindings"),
+    ];
+
+    private static readonly NavItem[] AdminItems =
+    [
+        new("/users",         "Users"),
+        new("/permissions",   "Permissions"),
+        new("/vhosts",        "Virtual Hosts"),
+        new("/limits",        "Vhost Limits"),
+        new("/parameters",    "Parameters"),
+        new("/feature-flags", "Feature Flags"),
+        new("/definitions",   "Definitions"),
+    ];
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try
+            {
+                _overview = await Rmq.GetOverviewAsync();
+                _connected = _overview is not null;
+            }
+            catch
+            {
+                _connected = false;
+            }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}

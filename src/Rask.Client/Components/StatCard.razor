@@ -1,0 +1,17 @@
+@* Stat card matching the original Next.js StatCard component *@
+
+<a href="@Href" class="bg-base-100 border border-base-300 rounded-lg p-4 shadow-sm hover:shadow transition-shadow block">
+    <p class="text-xs text-base-content/50 uppercase tracking-wide font-semibold">@Label</p>
+    <p class="text-2xl font-bold mt-1 tabular-nums">@Value</p>
+    @if (SubText is not null)
+    {
+        <p class="text-xs text-base-content/50 mt-1">@SubText</p>
+    }
+</a>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "—";
+    [Parameter] public string? SubText { get; set; }
+    [Parameter] public string Href { get; set; } = "#";
+}

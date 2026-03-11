@@ -1,0 +1,47 @@
+@inherits LayoutComponentBase
+@inject ThemeService Theme
+@inject EnvironmentStateService EnvState
+@implements IDisposable
+
+<div class="flex h-screen overflow-hidden bg-base-100">
+    @* ── Sidebar ── *@
+    <NavMenu OnOpenPublish="@(() => _publishOpen = true)"
+             OnSwitchEnv="@(() => _envGatewayOpen = true)" />
+
+    @* ── Main area ── *@
+    <div class="flex flex-1 flex-col overflow-hidden">
+        <HeaderBar />
+        <main class="flex-1 overflow-y-auto p-6">
+            @Body
+        </main>
+    </div>
+</div>
+
+@* ── Floating publish widget ── *@
+@if (_publishOpen)
+{
+    <PublishDialog OnClose="@(() => _publishOpen = false)" />
+}
+
+@* ── Environment gateway modal ── *@
+@if (_envGatewayOpen)
+{
+    <EnvGateway OnClose="@(() => _envGatewayOpen = false)" />
+}
+
+@code {
+    private bool _publishOpen;
+    private bool _envGatewayOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Theme.InitializeAsync();
+        await EnvState.LoadAsync();
+        Theme.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= StateHasChanged;
+    }
+}

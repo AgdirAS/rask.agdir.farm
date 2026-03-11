@@ -13,18 +13,3 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-
-  rask:
-    build: .
-    ports:
-      - "35672:35672"
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_MANAGEMENT_PORT: "15672"
-      RABBITMQ_AMQP_PORT: "5672"
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-    depends_on:
-      rabbitmq:
-        condition: service_healthy

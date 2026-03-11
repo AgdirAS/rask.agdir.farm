@@ -1,0 +1,43 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rask.Shared", "src\Rask.Shared\Rask.Shared.csproj", "{A1B2C3D4-1111-2222-3333-444444444444}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rask.Server", "src\Rask.Server\Rask.Server.csproj", "{A1B2C3D4-5555-6666-7777-888888888888}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rask.Client", "src\Rask.Client\Rask.Client.csproj", "{A1B2C3D4-9999-AAAA-BBBB-CCCCCCCCCCCC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rask.Server.Tests", "tests\Rask.Server.Tests\Rask.Server.Tests.csproj", "{A1B2C3D4-DDDD-EEEE-FFFF-111111111111}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rask.Client.Tests", "tests\Rask.Client.Tests\Rask.Client.Tests.csproj", "{A1B2C3D4-2222-3333-4444-555555555555}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1B2C3D4-1111-2222-3333-444444444444}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-1111-2222-3333-444444444444}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-1111-2222-3333-444444444444}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-1111-2222-3333-444444444444}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-5555-6666-7777-888888888888}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-5555-6666-7777-888888888888}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-5555-6666-7777-888888888888}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-5555-6666-7777-888888888888}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-9999-AAAA-BBBB-CCCCCCCCCCCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-9999-AAAA-BBBB-CCCCCCCCCCCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-9999-AAAA-BBBB-CCCCCCCCCCCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-9999-AAAA-BBBB-CCCCCCCCCCCC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-DDDD-EEEE-FFFF-111111111111}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-DDDD-EEEE-FFFF-111111111111}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-DDDD-EEEE-FFFF-111111111111}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-DDDD-EEEE-FFFF-111111111111}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1B2C3D4-2222-3333-4444-555555555555}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1B2C3D4-2222-3333-4444-555555555555}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1B2C3D4-2222-3333-4444-555555555555}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1B2C3D4-2222-3333-4444-555555555555}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

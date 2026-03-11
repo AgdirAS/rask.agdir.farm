@@ -1,0 +1,19 @@
+@page "/privacy"
+
+<PageTitle>Rask · Privacy</PageTitle>
+
+<div class="max-w-3xl space-y-4">
+    <h1 class="text-2xl font-bold">Privacy Policy</h1>
+    <p class="text-base-content/70 leading-relaxed">
+        Rask stores nothing about you or your usage. No telemetry, no analytics, no data leaves your server.
+    </p>
+    <p class="text-base-content/70 leading-relaxed">
+        RabbitMQ connection credentials are stored locally in a SQLite database on the server.
+        They can optionally be encrypted at rest using AES-256-GCM when a
+        <code class="bg-base-200 px-1 rounded text-sm">STORAGE_ENCRYPTION_KEY</code> environment variable is set.
+    </p>
+    <p class="text-base-content/70 leading-relaxed">
+        All communication between the Rask UI and your RabbitMQ broker is proxied server-side.
+        The browser never connects directly to RabbitMQ and never sees your credentials.
+    </p>
+</div>

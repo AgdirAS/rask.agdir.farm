@@ -1,0 +1,11 @@
+{
+  "name": "rask-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ci": "playwright test --reporter=junit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.1"
+  }
+}

@@ -1,0 +1,54 @@
+@page "/parameters"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Global Parameters</PageTitle>
+
+<div class="space-y-4">
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase"><th>Name</th><th>Component</th><th>Value</th><th></th></tr></thead>
+                <tbody>
+                    @if (_params is null)
+                    {
+                        <tr><td colspan="4" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else if (_params.Count == 0)
+                    {
+                        <tr><td colspan="4" class="text-center py-4 text-base-content/50">No global parameters</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in _params)
+                        {
+                            <tr class="hover">
+                                <td class="font-mono font-medium">@p.Name</td>
+                                <td>@p.Component</td>
+                                <td class="font-mono text-xs max-w-md truncate">@System.Text.Json.JsonSerializer.Serialize(p.Value)</td>
+                                <td><button @onclick="() => DeleteAsync(p.Name)" class="btn btn-ghost btn-xs text-error">Delete</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<GlobalParameter>? _params;
+    private Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _params = await Rmq.GetGlobalParametersAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task DeleteAsync(string name) { await Rmq.DeleteGlobalParameterAsync(name); _params = await Rmq.GetGlobalParametersAsync(); }
+    public void Dispose() => _timer?.Dispose();
+}

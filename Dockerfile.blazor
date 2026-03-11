@@ -1,0 +1,48 @@
+# ── Build stage ────────────────────────────────────────────────────────────────
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+WORKDIR /src
+
+# Copy project files first for better layer caching
+COPY src/Rask.Shared/Rask.Shared.csproj src/Rask.Shared/
+COPY src/Rask.Server/Rask.Server.csproj src/Rask.Server/
+COPY src/Rask.Client/Rask.Client.csproj src/Rask.Client/
+RUN dotnet restore src/Rask.Server/Rask.Server.csproj
+
+# Copy source and publish
+COPY src/ src/
+RUN dotnet publish src/Rask.Server/Rask.Server.csproj \
+    -c Release \
+    -o /app \
+    --no-restore
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -S rask && adduser -S rask -G rask
+
+# Data directory for SQLite
+RUN mkdir -p /app/data && chown rask:rask /app/data
+VOLUME ["/app/data"]
+
+COPY --from=build /app .
+
+# Environment defaults
+ENV ASPNETCORE_URLS=http://+:35672 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    RASK_DATA_DIR=/app/data \
+    RABBITMQ_HOST=localhost \
+    RABBITMQ_MANAGEMENT_PORT=15672 \
+    RABBITMQ_AMQP_PORT=5672 \
+    RABBITMQ_USER=guest \
+    RABBITMQ_PASSWORD=guest \
+    RABBITMQ_VHOST=/
+
+EXPOSE 35672
+
+USER rask
+
+ENTRYPOINT ["dotnet", "Rask.Server.dll"]

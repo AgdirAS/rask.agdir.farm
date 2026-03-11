@@ -1,0 +1,87 @@
+@page "/users"
+@inject RabbitMqService Rmq
+@implements IDisposable
+
+<PageTitle>Rask · Users</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex gap-3 items-center">
+        <input type="text" @bind="_search" @bind:event="oninput" placeholder="Search users…" class="input input-sm input-bordered w-64" />
+        <button @onclick="() => _showCreate = true" class="btn btn-primary btn-sm">Add User</button>
+    </div>
+
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr class="text-xs uppercase"><th>Name</th><th>Tags</th><th></th></tr></thead>
+                <tbody>
+                    @if (_users is null)
+                    {
+                        <tr><td colspan="3" class="text-center py-8"><span class="loading loading-spinner"></span></td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var u in Filtered)
+                        {
+                            <tr class="hover">
+                                <td class="font-medium">@u.Name</td>
+                                <td class="flex flex-wrap gap-1">
+                                    @foreach (var tag in u.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                    {
+                                        <span class="@($"badge badge-sm {(tag == "administrator" ? "badge-primary" : "badge-ghost")}")">@tag</span>
+                                    }
+                                    @if (string.IsNullOrEmpty(u.Tags))
+                                    {
+                                        <span class="text-base-content/40 text-xs">No tags</span>
+                                    }
+                                </td>
+                                <td><button @onclick="() => DeleteUserAsync(u.Name)" class="btn btn-ghost btn-xs text-error">Delete</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_showCreate)
+    {
+        <div class="bg-base-100 border border-base-300 rounded-lg p-6 space-y-3">
+            <h3 class="font-semibold">Add User</h3>
+            <div class="grid grid-cols-3 gap-3">
+                <div class="form-control"><label class="label"><span class="label-text text-xs">Username</span></label><input type="text" @bind="_newName" class="input input-sm input-bordered" /></div>
+                <div class="form-control"><label class="label"><span class="label-text text-xs">Password</span></label><input type="password" @bind="_newPass" class="input input-sm input-bordered" /></div>
+                <div class="form-control"><label class="label"><span class="label-text text-xs">Tags</span></label><input type="text" @bind="_newTags" class="input input-sm input-bordered" placeholder="administrator" /></div>
+            </div>
+            <div class="flex gap-2">
+                <button @onclick="CreateUserAsync" class="btn btn-primary btn-sm">Create</button>
+                <button @onclick="() => _showCreate = false" class="btn btn-ghost btn-sm">Cancel</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<RabbitUser>? _users;
+    private string _search = "";
+    private bool _showCreate;
+    private string _newName = "", _newPass = "", _newTags = "";
+    private Timer? _timer;
+
+    private IEnumerable<RabbitUser> Filtered => (_users ?? [])
+        .Where(u => string.IsNullOrEmpty(_search) || u.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            try { _users = await Rmq.GetUsersAsync(); } catch { }
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+    }
+
+    private async Task DeleteUserAsync(string name) { await Rmq.DeleteUserAsync(name); _users = await Rmq.GetUsersAsync(); }
+    private async Task CreateUserAsync() { await Rmq.PutUserAsync(_newName, new PutUserRequest(Tags: _newTags, Password: _newPass)); _showCreate = false; _users = await Rmq.GetUsersAsync(); }
+
+    public void Dispose() => _timer?.Dispose();
+}

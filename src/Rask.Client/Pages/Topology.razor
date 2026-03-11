@@ -1,0 +1,178 @@
+@page "/topology"
+@inject RabbitMqService Rmq
+@inject IJSRuntime Js
+@implements IDisposable
+
+<PageTitle>Rask · Topology</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex items-center gap-3">
+        <select @bind="_vhostFilter" class="select select-sm select-bordered">
+            <option value="">All vhosts</option>
+            @foreach (var vh in _vhosts)
+            {
+                <option value="@vh">@vh</option>
+            }
+        </select>
+        <button @onclick="RefreshAsync" class="btn btn-outline btn-sm">Refresh</button>
+    </div>
+
+    @* ── SVG-based topology graph ── *@
+    <div class="bg-base-100 border border-base-300 rounded-lg overflow-hidden" style="min-height: 500px;">
+        @if (_loading)
+        {
+            <div class="flex items-center justify-center h-96">
+                <span class="loading loading-spinner loading-lg"></span>
+            </div>
+        }
+        else
+        {
+            <svg viewBox="0 0 @_svgWidth @_svgHeight" class="w-full" style="min-height: 500px;">
+                @* ── Edges (bindings) ── *@
+                @foreach (var edge in _edges)
+                {
+                    <line x1="@edge.X1" y1="@edge.Y1" x2="@edge.X2" y2="@edge.Y2"
+                          stroke="currentColor" stroke-opacity="0.2" stroke-width="1.5" />
+                    @if (!string.IsNullOrEmpty(edge.Label))
+                    {
+                        @SvgText((edge.X1 + edge.X2) / 2, (edge.Y1 + edge.Y2) / 2 - 4, edge.Label,
+                            fontSize: 9, fillOpacity: "0.4")
+                    }
+                }
+
+                @* ── Exchange nodes (left column) ── *@
+                @foreach (var node in _exchangeNodes)
+                {
+                    <g>
+                        <rect x="@node.X" y="@node.Y" width="140" height="32" rx="6"
+                              fill="oklch(0.7 0.15 280)" fill-opacity="0.15" stroke="oklch(0.7 0.15 280)" stroke-width="1" />
+                        @SvgText(node.X + 70, node.Y + 20, TruncateName(node.Name, 18),
+                            fontSize: 11, fontFamily: "monospace")
+                    </g>
+                }
+
+                @* ── Queue nodes (right column) ── *@
+                @foreach (var node in _queueNodes)
+                {
+                    var isWarning = node.State != "running" && node.State != "idle";
+                    <g>
+                        <rect x="@node.X" y="@node.Y" width="140" height="32" rx="6"
+                              fill="@(isWarning ? "oklch(0.7 0.15 25)" : "oklch(0.7 0.15 220)")" fill-opacity="0.15"
+                              stroke="@(isWarning ? "oklch(0.7 0.15 25)" : "oklch(0.7 0.15 220)")" stroke-width="1" />
+                        @SvgText(node.X + 70, node.Y + 14, TruncateName(node.Name, 18),
+                            fontSize: 11, fontFamily: "monospace")
+                        @SvgText(node.X + 70, node.Y + 26, $"{node.Messages} msg · {node.Consumers} cons",
+                            fontSize: 9, fillOpacity: "0.5")
+                    </g>
+                }
+            </svg>
+        }
+    </div>
+
+    @* ── Trace feed ── *@
+    <div class="bg-base-100 border border-base-300 rounded-lg p-4">
+        <TraceTab Vhost="@(_vhostFilter == "" ? "/" : _vhostFilter)" />
+    </div>
+</div>
+
+@code {
+    private bool _loading = true;
+    private string _vhostFilter = "";
+    private List<RabbitExchange> _allExchanges = [];
+    private List<RabbitQueue> _allQueues = [];
+    private List<RabbitBinding> _allBindings = [];
+
+    private record GraphNode(string Name, int X, int Y, string State = "", long Messages = 0, int Consumers = 0);
+    private record GraphEdge(int X1, int Y1, int X2, int Y2, string Label);
+
+    private List<GraphNode> _exchangeNodes = [];
+    private List<GraphNode> _queueNodes = [];
+    private List<GraphEdge> _edges = [];
+    private int _svgWidth = 800;
+    private int _svgHeight = 600;
+    private Timer? _timer;
+
+    private IEnumerable<string> _vhosts => _allExchanges.Select(e => e.Vhost)
+        .Concat(_allQueues.Select(q => q.Vhost)).Distinct().OrderBy(v => v);
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(async _ =>
+        {
+            await RefreshAsync();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            _allExchanges = await Rmq.GetExchangesAsync() ?? [];
+            _allQueues = await Rmq.GetQueuesAsync() ?? [];
+            _allBindings = await Rmq.GetBindingsAsync() ?? [];
+            LayoutGraph();
+        }
+        catch { }
+        _loading = false;
+    }
+
+    private void LayoutGraph()
+    {
+        var exchanges = _allExchanges
+            .Where(e => string.IsNullOrEmpty(_vhostFilter) || e.Vhost == _vhostFilter)
+            .Where(e => !string.IsNullOrEmpty(e.Name))
+            .ToList();
+
+        var queues = _allQueues
+            .Where(q => string.IsNullOrEmpty(_vhostFilter) || q.Vhost == _vhostFilter)
+            .ToList();
+
+        var bindings = _allBindings
+            .Where(b => string.IsNullOrEmpty(_vhostFilter) || b.Vhost == _vhostFilter)
+            .Where(b => !string.IsNullOrEmpty(b.Source))
+            .ToList();
+
+        // Simple two-column layout
+        var leftX = 40;
+        var rightX = 500;
+        var spacing = 50;
+        var startY = 40;
+
+        _exchangeNodes = exchanges.Select((e, i) => new GraphNode(e.Name, leftX, startY + i * spacing)).ToList();
+        _queueNodes = queues.Select((q, i) => new GraphNode(q.Name, rightX, startY + i * spacing, q.State, q.Messages, q.Consumers)).ToList();
+
+        var exMap = _exchangeNodes.ToDictionary(n => n.Name);
+        var qMap = _queueNodes.ToDictionary(n => n.Name);
+
+        _edges = [];
+        foreach (var b in bindings)
+        {
+            if (exMap.TryGetValue(b.Source, out var src))
+            {
+                if (b.DestinationType == "queue" && qMap.TryGetValue(b.Destination, out var dst))
+                {
+                    _edges.Add(new GraphEdge(src.X + 140, src.Y + 16, dst.X, dst.Y + 16, b.RoutingKey));
+                }
+            }
+        }
+
+        var maxItems = Math.Max(exchanges.Count, queues.Count);
+        _svgHeight = Math.Max(startY + maxItems * spacing + 40, 400);
+        _svgWidth = 700;
+    }
+
+    private static string TruncateName(string name, int maxLen) =>
+        name.Length <= maxLen ? name : name[..(maxLen - 1)] + "\u2026";
+
+    private static MarkupString SvgText(int x, int y, string content,
+        int fontSize = 11, string fillOpacity = "1", string fontFamily = "")
+    {
+        var ff = string.IsNullOrEmpty(fontFamily) ? "" : $@" font-family=""{fontFamily}""";
+        var fo = fillOpacity == "1" ? "" : $@" fill-opacity=""{fillOpacity}""";
+        return new MarkupString(
+            $@"<text x=""{x}"" y=""{y}"" font-size=""{fontSize}"" fill=""currentColor""{fo}{ff} text-anchor=""middle"">{System.Net.WebUtility.HtmlEncode(content)}</text>");
+    }
+
+    public void Dispose() => _timer?.Dispose();
+}
